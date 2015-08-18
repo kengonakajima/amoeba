@@ -1,0 +1,37 @@
+{
+  "projectId": "amoeba",
+  "projectVersion": "1",
+  "contentId": "kengonakajima_b501",
+  "apiKey": "sk_dev_5debac4fe233fa144fa0caff",
+  "startups": [
+    {
+      "id": "Startup",
+      "multiconnection": false,
+      "numberOfPlayers": 0,
+      "dataPackId": "DataPack",
+      "executable": "amoeba.exe",
+      "workDir": "",
+      "arguments": null,
+      "FileHooks": null,
+      "CustomProperties": {}
+    }
+  ],
+  "dataPacks": [
+    {
+      "id": "DataPack",
+      "version": "1",
+      "files": [
+        {
+          "aliasPath": "",
+          "fileSystemPath": "C:\\Users\\ringo\\Documents\\GitHub\\amoeba\\Release"
+        },
+        {
+          "aliasPath": "assets",
+          "fileSystemPath": "C:\\Users\\ringo\\Documents\\GitHub\\amoeba\\assets"
+        }
+      ]
+    }
+  ],
+  "Services": [],
+  "reportConfig": null
+}
