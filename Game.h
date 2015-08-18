@@ -4,13 +4,16 @@
 
 #pragma once
 
-#include "pch.h"
+
 #include "StepTimer.h"
 #include "SpriteFont.h"
 #include "VertexTypes.h"
 #include "PrimitiveBatch.h"
 #include "Effects.h"
 #include "Audio.h"
+
+
+
 #include <math.h>
 
 using namespace DirectX;
@@ -62,6 +65,9 @@ inline int irange( int a, int b ) {
     double r = range(a,b);
     return (int)r;
 }
+
+
+void print( const char *fmt, ... );
 
 
 ///////////////////////
@@ -235,7 +241,9 @@ public:
     // Properites
     void GetDefaultSize( size_t& width, size_t& height ) const;
 
-    XMFLOAT4 GetPlayerColor( int index );
+    static XMFLOAT4 GetPlayerColor( int index );
+
+    PrimitiveBatch<VertexPositionColor> *GetPrimBatch() { return m_primBatch; }
     
 private:
 
@@ -245,6 +253,9 @@ private:
     void CreateResources();
     
     void OnDeviceLost();
+
+    void InitGameWorld();
+    
 
     // Application state
     HWND                                            m_window;
@@ -277,6 +288,8 @@ private:
     // game sprites
     AnimatedTexture *m_cellAnimTex;
 
+    // chipmunk related
+    struct cpSpace *m_space;
 
 	AudioEngine *m_audioEngine;
 	SoundEffect *m_soundEffect;
@@ -285,5 +298,7 @@ private:
     
     
 };
+
+
 
 

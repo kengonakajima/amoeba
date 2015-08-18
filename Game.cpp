@@ -1,18 +1,36 @@
 //
 // Game.cpp -
 //
-
 #include "pch.h"
 
 #include "DDSTextureLoader.h"
 #include "CommonStates.h"
 #include <assert.h>
 
+
+
+
+#include "Phys.h"
 #include "Game.h"
 
 
 
 
+///////////////////
+// Utils from cumino
+
+void print( const char *fmt, ... ){
+    char dest[1024*16];
+    va_list argptr;
+    va_start( argptr, fmt );
+    vsnprintf( dest, sizeof(dest), fmt, argptr );
+    va_end( argptr );
+    fprintf( stderr, "%s\n", dest );
+#ifdef WIN32
+	OutputDebugStringA(dest);
+	OutputDebugStringA("\n");
+#endif
+}
 
 
 
@@ -80,6 +98,62 @@ void Game::Initialize(HWND window)
 	m_audioEngine = new AudioEngine(eflags);
 	m_soundEffect = new SoundEffect(m_audioEngine, L"assets\\coinget.wav");
 	m_soundEffect->Play();
+
+
+    // chipmunk
+    InitGameWorld();
+}
+
+void Game::InitGameWorld() {
+
+    m_space = cpSpaceNew();
+
+	cpSpaceSetIterations(m_space, 10);
+	cpSpaceSetGravity(m_space, cpv(0, -1000));
+	cpSpaceSetCollisionSlop(m_space, 2.0);
+
+	cpBody *staticBody = cpSpaceGetStaticBody( m_space);
+	cpShape *shape;
+
+	// Create segments around the edge of the screen.
+	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv(-340,-260), cpv(-340, 260), 20.0f));
+	cpShapeSetElasticity(shape, 1.0f);
+	cpShapeSetFriction(shape, 1.0f);
+	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
+
+	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv( 340,-260), cpv( 340, 260), 20.0f));
+	cpShapeSetElasticity(shape, 1.0f);
+	cpShapeSetFriction(shape, 1.0f);
+	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
+
+	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv(-340,-260), cpv( 340,-260), 20.0f));
+	cpShapeSetElasticity(shape, 1.0f);
+	cpShapeSetFriction(shape, 1.0f);
+	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
+	
+	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv(-340, 260), cpv( 340, 260), 20.0f));
+	cpShapeSetElasticity(shape, 1.0f);
+	cpShapeSetFriction(shape, 1.0f);
+	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
+	
+	for(int i=0; i<200; i++){
+		cpFloat mass = 0.15f;
+		cpFloat radius = 10.0f;
+        BodyState *bs = new BodyState(i,i%2,this);
+
+		cpBody *body = cpSpaceAddBody(m_space, cpBodyNew(mass, cpMomentForCircle(mass, 0.0f, radius, cpvzero)));
+		cpBodySetPosition(body, cpv(cpflerp(-150.0f, 150.0f, frand()), cpflerp(-150.0f, 150.0f, frand())));
+        cpBodySetUserData(body, bs);
+        
+		cpShape *shape = cpSpaceAddShape(m_space, cpCircleShapeNew(body, radius + STICK_SENSOR_THICKNESS, cpvzero));
+		cpShapeSetFriction(shape, 0.9f);
+		cpShapeSetCollisionType(shape, COLLISION_TYPE_STICKY);
+	}
+	
+	cpCollisionHandler *handler = cpSpaceAddWildcardHandler(m_space, COLLISION_TYPE_STICKY);
+	handler->preSolveFunc = StickyPreSolve;
+	handler->separateFunc = StickySeparate;
+    
 }
 
 // Executes basic game loop.
@@ -106,9 +180,43 @@ void Game::Update(DX::StepTimer const& timer)
 		OutputDebugString(L"AudioEngine error!");
 	}
     m_cellAnimTex->Update(elapsedTime);
+    PhysUpdateSpace( m_space, elapsedTime );
 }
 
 // Draws the scene
+void DrawCircle( PrimitiveBatch<VertexPositionColor> *pb, XMFLOAT3 pos, float dia, XMFLOAT4 col ) {
+    const int N = 32;
+    VertexPositionColor vertices[N+1];
+
+    for(int i=0;i<N+1;i++) {
+        float rad = 2.0f * M_PI * (float)i / (float)N;
+        if(i%2==0) {
+            vertices[N-i] = VertexPositionColor( XMFLOAT3( pos.x+cos(rad)*dia, pos.y+sin(rad)*dia, 0 ), col );
+        } else {
+            vertices[N-i] = VertexPositionColor( pos, col );
+        }
+    }
+    pb->Draw( D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP, vertices, N+1 );
+}
+
+
+void eachBodyDrawCallback( cpBody *body, void *data ) {
+    BodyState *bs = (BodyState*) cpBodyGetUserData(body);
+    Game *game = (Game*) data;
+
+    cpVect cppos = cpBodyGetPosition(body);
+
+
+    // draw
+    size_t scrw, scrh;
+    game->GetDefaultSize(scrw,scrh);
+    XMFLOAT3 dxtkPos( cppos.x+scrw/2, - cppos.y + scrh/2, 0 );
+    XMFLOAT4 dxtkCol = Game::GetPlayerColor( bs->group_id );
+    //    print( "id:%d g:%d xy:%f,%f", bs->id, bs->group_id, dxtkPos.x, dxtkPos.y );    
+    DrawCircle( game->GetPrimBatch(), dxtkPos, 20, dxtkCol );
+    
+}
+
 void Game::Render()
 {
 	m_framecnt++;
@@ -149,20 +257,17 @@ void Game::Render()
     m_primBatch->Begin();
     m_primBatch->DrawLine( VertexPositionColor( XMFLOAT3(10,10,0), XMFLOAT4(1,0,1,1)),
                            VertexPositionColor( XMFLOAT3(100,200,0), XMFLOAT4(1,1,0,1)) );
-    VertexPositionColor vertices[32+1];
+
     XMFLOAT4 col = GetPlayerColor( irange(0,5) );
     XMFLOAT3 cirpos( range(0,500), range(0,300),0 );
-    for(int i=0;i<32+1;i++) {
-        float rad = 2.0f * M_PI * (float)i / 32.0f;
-        float dia = 20;
-        if(i%2==0) {
-            vertices[32-i] = VertexPositionColor( XMFLOAT3( cirpos.x+cos(rad)*dia, cirpos.y+sin(rad)*dia, 0 ), col );
-        } else {
-            vertices[32-i] = VertexPositionColor( cirpos, col );
-        }
-    }
-    m_primBatch->Draw( D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP, vertices, 32+1 );
+    
+    DrawCircle( m_primBatch, cirpos, range(10,50), col );
+    DrawCircle( m_primBatch, XMFLOAT3(cirpos.x+50,cirpos.y+50,0), range(10,50), col );    
+
+    cpSpaceEachBody( m_space, eachBodyDrawCallback, (void*) this );
+    
     m_primBatch->End();
+    
 
     Present();
 }
@@ -481,3 +586,6 @@ XMFLOAT4 Game::GetPlayerColor( int index ) {
     assert( index >= 0 && index < MAX_PLAYER_NUM );
     return g_playerColors[index];
 }
+
+
+////////////////////
