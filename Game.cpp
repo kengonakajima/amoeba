@@ -6,7 +6,7 @@
 
 #include "DDSTextureLoader.h"
 #include "CommonStates.h"
-
+#include <assert.h>
 
 #include "Game.h"
 
@@ -43,7 +43,23 @@ void Game::Initialize(HWND window)
     */
 	m_spriteBatch = new SpriteBatch(m_d3dContext.Get());
 	m_spriteFont = new SpriteFont( m_d3dDevice.Get(), L"assets\\tahoma32.spritefont");
+    m_primBatch = new PrimitiveBatch<VertexPositionColor>(m_d3dContext.Get());
 
+    m_basicEffect = new BasicEffect(m_d3dDevice.Get() );
+    size_t scrw, scrh;
+    GetDefaultSize(scrw,scrh);    
+    m_basicEffect->SetProjection( XMMatrixOrthographicOffCenterRH(0, scrw, scrh, 0,0,1 ) );
+    m_basicEffect->SetVertexColorEnabled(true);
+
+    void const* shaderByteCode;
+    size_t byteCodeLength ;
+    m_basicEffect->GetVertexShaderBytecode( &shaderByteCode, &byteCodeLength );
+    m_d3dDevice->CreateInputLayout( VertexPositionColor::InputElements,
+                                    VertexPositionColor::InputElementCount,
+                                    shaderByteCode, byteCodeLength,
+                                    m_inputLayout.GetAddressOf() );
+
+    
     //
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cell;
     enum DDS_ALPHA_MODE alphamode = DDS_ALPHA_MODE_STRAIGHT;
@@ -102,7 +118,7 @@ void Game::Render()
 
     Clear();
 
-    // TODO: Add your rendering code here
+    // Sprites
     CommonStates states(m_d3dDevice.Get());
 	m_spriteBatch->Begin( SpriteSortMode_Deferred, states.NonPremultiplied() );
 
@@ -121,6 +137,32 @@ void Game::Render()
 
 	m_spriteBatch->End();
 
+    // Prims
+
+    m_d3dContext->OMSetBlendState( states.Opaque(), nullptr, 0xffffffff );
+    m_d3dContext->OMSetDepthStencilState( states.DepthNone(), 0 );
+    m_d3dContext->RSSetState( states.CullCounterClockwise() );
+
+    m_basicEffect->Apply( m_d3dContext.Get() );
+    m_d3dContext->IASetInputLayout( m_inputLayout.Get() );
+
+    m_primBatch->Begin();
+    m_primBatch->DrawLine( VertexPositionColor( XMFLOAT3(10,10,0), XMFLOAT4(1,0,1,1)),
+                           VertexPositionColor( XMFLOAT3(100,200,0), XMFLOAT4(1,1,0,1)) );
+    VertexPositionColor vertices[32+1];
+    XMFLOAT4 col = GetPlayerColor( irange(0,5) );
+    XMFLOAT3 cirpos( range(0,500), range(0,300),0 );
+    for(int i=0;i<32+1;i++) {
+        float rad = 2.0f * M_PI * (float)i / 32.0f;
+        float dia = 20;
+        if(i%2==0) {
+            vertices[32-i] = VertexPositionColor( XMFLOAT3( cirpos.x+cos(rad)*dia, cirpos.y+sin(rad)*dia, 0 ), col );
+        } else {
+            vertices[32-i] = VertexPositionColor( cirpos, col );
+        }
+    }
+    m_primBatch->Draw( D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP, vertices, 32+1 );
+    m_primBatch->End();
 
     Present();
 }
@@ -424,4 +466,18 @@ void Game::OnKeydown(int keycode) {
 
 	if (keycode == 'Q' ) exit(0); 
 	if (keycode == 'P') m_soundEffect->Play();
+}
+
+
+XMFLOAT4 g_playerColors[MAX_PLAYER_NUM] = {
+    { 0, 0.63137254f, 0.79607843f, 1 }, // blue
+    { 0.38039215f, 0.6823529f, 0.1411764f, 1 }, // green
+    { 0.84313725f, 0, 0.3764f, 1 }, // red
+    { 0.94509803f, 0.552941f, 0.019607f, 1 }, // orange
+    { 0.38039215f, 0.3803921f, 0.380392f, 1 } // gray
+};
+
+XMFLOAT4 Game::GetPlayerColor( int index ) {
+    assert( index >= 0 && index < MAX_PLAYER_NUM );
+    return g_playerColors[index];
 }
