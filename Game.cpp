@@ -139,10 +139,28 @@ void Game::InitGameWorld() {
 	for(int i=0; i<200; i++){
 		cpFloat mass = 0.15f;
 		cpFloat radius = 10.0f;
-        BodyState *bs = new BodyState(i,i%2,this);
+        int group_id = i % 2;
+        int eye_id = -1;
+        float minx,maxx;
+        if( group_id == 0 ) {
+            minx = -150;
+            maxx = -50;
+        } else {
+            minx = 50;
+            maxx = 150;
+        }
+        
+        // player 0 eyes
+        if( i == 196 ) eye_id = 0;
+        if( i == 198 ) eye_id = 1;
+        // player 1 eyes
+        if( i == 197 ) eye_id = 0;
+        if( i == 199 ) eye_id = 1;
+        
+        BodyState *bs = new BodyState(i,group_id,eye_id, this);
 
 		cpBody *body = cpSpaceAddBody(m_space, cpBodyNew(mass, cpMomentForCircle(mass, 0.0f, radius, cpvzero)));
-		cpBodySetPosition(body, cpv(cpflerp(-150.0f, 150.0f, frand()), cpflerp(-150.0f, 150.0f, frand())));
+		cpBodySetPosition(body, cpv(cpflerp(minx, maxx, frand()), cpflerp(-150.0f, 150.0f, frand())));
         cpBodySetUserData(body, bs);
         
 		cpShape *shape = cpSpaceAddShape(m_space, cpCircleShapeNew(body, radius + STICK_SENSOR_THICKNESS, cpvzero));
@@ -212,7 +230,10 @@ void eachBodyDrawCallback( cpBody *body, void *data ) {
     game->GetDefaultSize(scrw,scrh);
     XMFLOAT3 dxtkPos( cppos.x+scrw/2, - cppos.y + scrh/2, 0 );
     XMFLOAT4 dxtkCol = Game::GetPlayerColor( bs->group_id );
-    //    print( "id:%d g:%d xy:%f,%f", bs->id, bs->group_id, dxtkPos.x, dxtkPos.y );    
+    //    print( "id:%d g:%d xy:%f,%f", bs->id, bs->group_id, dxtkPos.x, dxtkPos.y );
+    if( bs->eye_id >= 0 ) {
+        dxtkCol = XMFLOAT4( 0.2,0.2,0.2,1);
+    }
     DrawCircle( game->GetPrimBatch(), dxtkPos, 20, dxtkCol );
     
 }

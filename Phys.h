@@ -30,8 +30,9 @@ class BodyState {
 public:
 	int id;
     int group_id;
+    int eye_id; // -1 for normal, 0,1 for eyes (left/right joystick)
     Game *game;
-	BodyState(int id, int gid, Game *game) : id(id), group_id(gid), game(game) {};
+	BodyState(int id, int gid, int eye_id, Game *game) : id(id), group_id(gid), eye_id(eye_id), game(game) {};
 };
 
 
