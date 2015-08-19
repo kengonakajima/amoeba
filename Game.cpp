@@ -109,29 +109,33 @@ void Game::InitGameWorld() {
     m_space = cpSpaceNew();
 
 	cpSpaceSetIterations(m_space, 10);
-	cpSpaceSetGravity(m_space, cpv(0, -1000));
+	cpSpaceSetGravity(m_space, cpv(0, -300));
 	cpSpaceSetCollisionSlop(m_space, 2.0);
 
 	cpBody *staticBody = cpSpaceGetStaticBody( m_space);
 	cpShape *shape;
 
 	// Create segments around the edge of the screen.
-	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv(-340,-260), cpv(-340, 260), 20.0f));
+    size_t w,h;
+    GetDefaultSize(w,h);
+
+    float minx = -(float)w/2, maxx = w/2, miny = -(float)h/2, maxy = h/2;
+	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv(minx,miny), cpv(minx, maxy), 20.0f)); // left
 	cpShapeSetElasticity(shape, 1.0f);
 	cpShapeSetFriction(shape, 1.0f);
 	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
 
-	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv( 340,-260), cpv( 340, 260), 20.0f));
+	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv( maxx,miny), cpv( maxx, maxy), 20.0f)); // right
 	cpShapeSetElasticity(shape, 1.0f);
 	cpShapeSetFriction(shape, 1.0f);
 	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
 
-	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv(-340,-260), cpv( 340,-260), 20.0f));
+	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv(minx,miny), cpv( maxx,miny), 20.0f)); // bottom
 	cpShapeSetElasticity(shape, 1.0f);
 	cpShapeSetFriction(shape, 1.0f);
 	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
 	
-	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv(-340, 260), cpv( 340, 260), 20.0f));
+	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv(minx, maxy), cpv( maxx, maxy), 20.0f)); // top
 	cpShapeSetElasticity(shape, 1.0f);
 	cpShapeSetFriction(shape, 1.0f);
 	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
@@ -141,13 +145,13 @@ void Game::InitGameWorld() {
 		cpFloat radius = 10.0f;
         int group_id = i % 2;
         int eye_id = -1;
-        float minx,maxx;
+        float pcminx,pcmaxx;
         if( group_id == 0 ) {
-            minx = -150;
-            maxx = -50;
+            pcminx = minx+20;
+            pcmaxx = -50;
         } else {
-            minx = 50;
-            maxx = 150;
+            pcminx = 50;
+            pcmaxx = maxx-20;
         }
         
         // player 0 eyes
@@ -160,7 +164,9 @@ void Game::InitGameWorld() {
         BodyState *bs = new BodyState(i,group_id,eye_id, this);
 
 		cpBody *body = cpSpaceAddBody(m_space, cpBodyNew(mass, cpMomentForCircle(mass, 0.0f, radius, cpvzero)));
-		cpBodySetPosition(body, cpv(cpflerp(minx, maxx, frand()), cpflerp(-150.0f, 150.0f, frand())));
+        cpVect p = cpv( cpflerp(pcminx, pcmaxx, frand()), cpflerp(miny, maxy, frand() ) );
+        print("%d: %f,%f   minmax:%f,%f", i, p.x, p.y, pcminx, pcmaxx );
+		cpBodySetPosition(body, p);
         cpBodySetUserData(body, bs);
         
 		cpShape *shape = cpSpaceAddShape(m_space, cpCircleShapeNew(body, radius + STICK_SENSOR_THICKNESS, cpvzero));
