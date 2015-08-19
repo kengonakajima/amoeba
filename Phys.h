@@ -16,7 +16,7 @@ enum {
 	COLLISION_TYPE_STICKY = 1,
 };
 
-#define STICK_SENSOR_THICKNESS 7.5f
+#define STICK_SENSOR_THICKNESS 2.0f
 
 
 #define GRABBABLE_MASK_BIT (1<<31)
@@ -39,3 +39,4 @@ public:
 
 ////
 
+cpConstraint *new_spring(cpBody *a, cpBody *b, cpVect anchorA, cpVect anchorB, cpFloat restLength, cpFloat stiff, cpFloat damp);

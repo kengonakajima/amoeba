@@ -59,7 +59,7 @@ cpBool StickyPreSolve(cpArbiter *arb, cpSpace *space, void *data)
 			joint = cpPivotJointNew2(bodyA, bodyB, anchorA, anchorB);
 
 			// Give it a finite force for the stickyness.
-			cpConstraintSetMaxForce(joint, 3e3);
+			cpConstraintSetMaxForce(joint, 4e3);
 
 			// Schedule a post-step() callback to add the joint.
 			cpSpaceAddPostStepCallback(space, PostStepAddJoint, joint, NULL);
@@ -112,4 +112,19 @@ void StickySeparate(cpArbiter *arb, cpSpace *space, void *data)
 void PhysUpdateSpace(cpSpace *space, double dt)
 {
 	cpSpaceStep(space, dt);
+}
+
+static cpFloat springForce(cpConstraint *spring, cpFloat dist)
+{
+	cpFloat clamp = 200000.0f;
+	return cpfclamp(cpDampedSpringGetRestLength(spring) - dist, -clamp, clamp)*cpDampedSpringGetStiffness(spring);
+}
+
+
+cpConstraint *new_spring(cpBody *a, cpBody *b, cpVect anchorA, cpVect anchorB, cpFloat restLength, cpFloat stiff, cpFloat damp)
+{
+	cpConstraint *spring = cpDampedSpringNew(a, b, anchorA, anchorB, restLength, stiff, damp);
+	cpDampedSpringSetSpringForceFunc(spring, springForce);
+	
+	return spring;
 }

@@ -110,7 +110,7 @@ void Game::InitGameWorld() {
     m_space = cpSpaceNew();
 
 	cpSpaceSetIterations(m_space, 10);
-	cpSpaceSetGravity(m_space, cpv(0, -100));
+	cpSpaceSetGravity(m_space, cpv(0, -10));
 	cpSpaceSetCollisionSlop(m_space, 2.0);
 
 	cpBody *staticBody = cpSpaceGetStaticBody( m_space);
@@ -140,9 +140,12 @@ void Game::InitGameWorld() {
 	cpShapeSetElasticity(shape, 1.0f);
 	cpShapeSetFriction(shape, 1.0f);
 	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
-	
+
+    cpBody *lefteyes[MAX_PLAYER_NUM], *righteyes[MAX_PLAYER_NUM];
+    for(int i=0;i<MAX_PLAYER_NUM;i++) lefteyes[i] = righteyes[i] = NULL;
+    
 	for(int i=0; i<200; i++){
-		cpFloat mass = 0.15f, eye_mass = 50.0f;
+		cpFloat mass = 0.1f, eye_mass = 10.0f;
 		cpFloat radius = 10.0f;
         int group_id = i % 2;
         int eye_id = -1;
@@ -156,7 +159,7 @@ void Game::InitGameWorld() {
         }
         
         // player 0 eyes
-        if( i == 196 ) eye_id = 0;
+        if( i == 196 ) eye_id = 0; 
         if( i == 198 ) eye_id = 1;
         // player 1 eyes
         if( i == 197 ) eye_id = 0;
@@ -176,7 +179,14 @@ void Game::InitGameWorld() {
 		cpShape *shape = cpSpaceAddShape(m_space, cpCircleShapeNew(body, radius + STICK_SENSOR_THICKNESS, cpvzero));
 		cpShapeSetFriction(shape, 0.95f);
 		cpShapeSetCollisionType(shape, COLLISION_TYPE_STICKY);
+
+        if( eye_id == 0 ) lefteyes[group_id] = body;
+        else if( eye_id == 1 ) righteyes[group_id] = body;        
 	}
+    // add springs between eyes
+    cpSpaceAddConstraint( m_space, new_spring( lefteyes[0], righteyes[0], cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );
+    cpSpaceAddConstraint( m_space, new_spring( lefteyes[1], righteyes[1], cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );    
+
 	
 	cpCollisionHandler *handler = cpSpaceAddWildcardHandler(m_space, COLLISION_TYPE_STICKY);
 	handler->preSolveFunc = StickyPreSolve;
@@ -206,7 +216,7 @@ void eachBodyForceUpdateCallback( cpBody *body, void *data ) {
     XMFLOAT2 l,r;
     game->GetCreatureForce( player_index, &l, &r );
 
-    float scl = 20000;
+    float scl = 10000;
     cpVect f;
     if( force_index == 0 ) { 
         //        print("setforce L: %d g:%d e:%d %f %f", bs->id, player_index, force_index, l.x, l.y );
@@ -216,9 +226,12 @@ void eachBodyForceUpdateCallback( cpBody *body, void *data ) {
         //        print("setforce R: %d g:%d e:%d %f %f", bs->id, player_index, force_index, r.x, r.y );
         f = cpv( r.x * scl, r.y * scl );
         bs->force = len( r.x, r.y );
+        //        cpBodySetTorque( body, len(f.x,f.y)*10 );
     }
+
+        cpBodySetForce( body, f );        
     
-    cpBodySetForce( body, f );
+
     //    cpVect v = cpBodyGetVelocity( body );
     //    cpBodySetVelocity( body, cpv( v.x + f.x/1000, v.y + f.y/1000) );
 }
