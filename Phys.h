@@ -16,7 +16,7 @@ enum {
 	COLLISION_TYPE_STICKY = 1,
 };
 
-#define STICK_SENSOR_THICKNESS 5.5f
+#define STICK_SENSOR_THICKNESS 7.5f
 
 
 #define GRABBABLE_MASK_BIT (1<<31)
@@ -31,8 +31,9 @@ public:
 	int id;
     int group_id;
     int eye_id; // -1 for normal, 0,1 for eyes (left/right joystick)
+    float force;
     Game *game;
-	BodyState(int id, int gid, int eye_id, Game *game) : id(id), group_id(gid), eye_id(eye_id), game(game) {};
+	BodyState(int id, int gid, int eye_id, Game *game) : id(id), group_id(gid), eye_id(eye_id), force(0), game(game) {};
 };
 
 

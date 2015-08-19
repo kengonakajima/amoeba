@@ -13,6 +13,7 @@
 #include "Audio.h"
 #include "GamePad.h"
 
+#include "Main.h"
 #include "AnimatedTexture.h"
 #include "Util.h"
 
@@ -23,11 +24,37 @@ using namespace Microsoft::WRL;
 using Microsoft::WRL::ComPtr;
 
 
-#define MAX_PLAYER_NUM 5
+#define MAX_PLAYER_NUM 4
 
 //////////////
 
+/* One-to-many Player
+  
+class Player
+{
+public:
+    Player( shinra::PlayerID playerID, std::shared_ptr<SpriteFont> font);
+    shinra::PlayerID getPlayerID() { return playerID; }
+    void Update();
+    void Render(int frameCnt);
+    void handleInput(const RAWINPUT& rawInput);
+private:
+    // Show status logs
+    shinra::PlayerID playerID;
+    std::unique_ptr<SpriteBatch> m_spriteBatch;
+    std::shared_ptr<SpriteFont> m_spriteFont;
+    std::unique_ptr<AudioEngine> m_audioEngine;
+    std::unique_ptr<SoundEffect> m_soundEffect;
+    WCHAR						m_lastKey;
 
+};
+*/
+
+
+struct CreatureForce {
+public:
+    XMFLOAT2 leftEye, rightEye;
+};
 
 // A basic game implementation that creates a D3D11 device and
 // provides a game loop
@@ -62,6 +89,12 @@ public:
     static XMFLOAT4 GetPlayerColor( int index );
 
     PrimitiveBatch<VertexPositionColor> *GetPrimBatch() { return m_primBatch; }
+
+    void InitCreatureForce() {
+        for(int i=0;i<MAX_PLAYER_NUM;i++) SetCreatureForce( 0, XMFLOAT2(0,0), XMFLOAT2(0,0) );
+    }
+    void SetCreatureForce( int index, XMFLOAT2 leftEye, XMFLOAT2 rightEye );
+    void GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye );
     
 private:
 
@@ -91,7 +124,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView>  m_renderTargetView;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilView>  m_depthStencilView;
     Microsoft::WRL::ComPtr<ID3D11Texture2D>         m_depthStencil;
-
+    
     // Game state
     DX::StepTimer                                   m_timer;
 	int m_framecnt;
@@ -112,10 +145,12 @@ private:
 	AudioEngine *m_audioEngine;
 	SoundEffect *m_soundEffect;
 
-
-    
+    // Movement
+    CreatureForce m_forces[MAX_PLAYER_NUM];
     
 };
+
+
 
 
 

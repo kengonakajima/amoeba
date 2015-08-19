@@ -44,3 +44,9 @@ inline int irange( int a, int b ) {
 void print( const char *fmt, ... );
 
 
+inline float len(float x0, float y0, float x1, float y1 ){
+    return sqrt( (x1-x0)*(x1-x0) + (y1-y0)*(y1-y0));
+}
+inline float len(float x, float y ) {
+    return sqrt( x*x + y*y);
+}

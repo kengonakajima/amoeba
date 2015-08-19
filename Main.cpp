@@ -3,6 +3,9 @@
 //
 
 #include "pch.h"
+
+
+
 #include "Game.h"
 
 using namespace DirectX;
@@ -10,9 +13,16 @@ using namespace DirectX;
 namespace
 {
     std::unique_ptr<Game> g_game;
+    std::unique_ptr<GamePad> g_gamePad;
 };
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+
+GamePad::State GetGamePadState( int padId ) {
+    GamePad::State state = g_gamePad->GetState(padId);
+    return state;
+}
+
 
 // Entry point
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
@@ -24,8 +34,9 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (FAILED(hr))
         return 1;
 
+    g_gamePad.reset( new GamePad() );
     g_game.reset( new Game() );
-
+    
     // Register class and create window
     {
         // Register class

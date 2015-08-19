@@ -102,6 +102,7 @@ void Game::Initialize(HWND window)
 
     // chipmunk
     InitGameWorld();
+    InitCreatureForce();
 }
 
 void Game::InitGameWorld() {
@@ -109,7 +110,7 @@ void Game::InitGameWorld() {
     m_space = cpSpaceNew();
 
 	cpSpaceSetIterations(m_space, 10);
-	cpSpaceSetGravity(m_space, cpv(0, -300));
+	cpSpaceSetGravity(m_space, cpv(0, -100));
 	cpSpaceSetCollisionSlop(m_space, 2.0);
 
 	cpBody *staticBody = cpSpaceGetStaticBody( m_space);
@@ -141,7 +142,7 @@ void Game::InitGameWorld() {
 	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
 	
 	for(int i=0; i<200; i++){
-		cpFloat mass = 0.15f;
+		cpFloat mass = 0.15f, eye_mass = 50.0f;
 		cpFloat radius = 10.0f;
         int group_id = i % 2;
         int eye_id = -1;
@@ -163,14 +164,17 @@ void Game::InitGameWorld() {
         
         BodyState *bs = new BodyState(i,group_id,eye_id, this);
 
-		cpBody *body = cpSpaceAddBody(m_space, cpBodyNew(mass, cpMomentForCircle(mass, 0.0f, radius, cpvzero)));
+        cpFloat m = mass;
+        if( eye_id >= 0 ) m = eye_mass;
+        
+		cpBody *body = cpSpaceAddBody(m_space, cpBodyNew( m, cpMomentForCircle(mass, 0.0f, radius, cpvzero)));
         cpVect p = cpv( cpflerp(pcminx, pcmaxx, frand()), cpflerp(miny, maxy, frand() ) );
         print("%d: %f,%f   minmax:%f,%f", i, p.x, p.y, pcminx, pcmaxx );
 		cpBodySetPosition(body, p);
         cpBodySetUserData(body, bs);
         
 		cpShape *shape = cpSpaceAddShape(m_space, cpCircleShapeNew(body, radius + STICK_SENSOR_THICKNESS, cpvzero));
-		cpShapeSetFriction(shape, 0.9f);
+		cpShapeSetFriction(shape, 0.95f);
 		cpShapeSetCollisionType(shape, COLLISION_TYPE_STICKY);
 	}
 	
@@ -191,6 +195,33 @@ void Game::Tick()
     Render();
 }
 
+void eachBodyForceUpdateCallback( cpBody *body, void *data ) {
+    BodyState *bs = (BodyState*) cpBodyGetUserData(body);
+    Game *game = (Game*) data;
+
+    if( bs->eye_id < 0 ) return;
+    int player_index = bs->group_id;
+    int force_index = bs->eye_id;
+
+    XMFLOAT2 l,r;
+    game->GetCreatureForce( player_index, &l, &r );
+
+    float scl = 20000;
+    cpVect f;
+    if( force_index == 0 ) { 
+        //        print("setforce L: %d g:%d e:%d %f %f", bs->id, player_index, force_index, l.x, l.y );
+        f = cpv( l.x * scl, l.y * scl );
+        bs->force = len( l.x, l.y );
+    } else {
+        //        print("setforce R: %d g:%d e:%d %f %f", bs->id, player_index, force_index, r.x, r.y );
+        f = cpv( r.x * scl, r.y * scl );
+        bs->force = len( r.x, r.y );
+    }
+    
+    cpBodySetForce( body, f );
+    //    cpVect v = cpBodyGetVelocity( body );
+    //    cpBodySetVelocity( body, cpv( v.x + f.x/1000, v.y + f.y/1000) );
+}
 // Updates the world
 void Game::Update(DX::StepTimer const& timer)
 {
@@ -205,6 +236,25 @@ void Game::Update(DX::StepTimer const& timer)
 	}
     m_cellAnimTex->Update(elapsedTime);
     PhysUpdateSpace( m_space, elapsedTime );
+
+    // read joystick
+#if 0    
+    print( "js: %.1f %.1f %.1f %.1f %d %d %d %d",
+           state.thumbSticks.leftX, state.thumbSticks.leftY,
+           state.thumbSticks.rightX, state.thumbSticks.rightY,           
+           state.IsAPressed(), state.IsBPressed(), state.IsXPressed(), state.IsYPressed() );
+#endif
+    for(int i=0;i<MAX_PLAYER_NUM;i++) {
+        auto state = GetGamePadState(i);      
+        if( state.IsConnected()) {
+            SetCreatureForce( i,
+                              XMFLOAT2( state.thumbSticks.leftX, state.thumbSticks.leftY),
+                              XMFLOAT2( state.thumbSticks.rightX, state.thumbSticks.rightY)
+                              );
+        }
+    }
+
+    cpSpaceEachBody( m_space, eachBodyForceUpdateCallback, (void*) this );    
 }
 
 // Draws the scene
@@ -238,7 +288,7 @@ void eachBodyDrawCallback( cpBody *body, void *data ) {
     XMFLOAT4 dxtkCol = Game::GetPlayerColor( bs->group_id );
     //    print( "id:%d g:%d xy:%f,%f", bs->id, bs->group_id, dxtkPos.x, dxtkPos.y );
     if( bs->eye_id >= 0 ) {
-        dxtkCol = XMFLOAT4( 0.2,0.2,0.2,1);
+        dxtkCol = XMFLOAT4( bs->force,0.2,0.2,1);
     }
     DrawCircle( game->GetPrimBatch(), dxtkPos, 20, dxtkCol );
     
@@ -606,7 +656,7 @@ XMFLOAT4 g_playerColors[MAX_PLAYER_NUM] = {
     { 0.38039215f, 0.6823529f, 0.1411764f, 1 }, // green
     { 0.84313725f, 0, 0.3764f, 1 }, // red
     { 0.94509803f, 0.552941f, 0.019607f, 1 }, // orange
-    { 0.38039215f, 0.3803921f, 0.380392f, 1 } // gray
+    //    { 0.38039215f, 0.3803921f, 0.380392f, 1 } // gray
 };
 
 XMFLOAT4 Game::GetPlayerColor( int index ) {
@@ -614,5 +664,15 @@ XMFLOAT4 Game::GetPlayerColor( int index ) {
     return g_playerColors[index];
 }
 
+void Game::SetCreatureForce( int index, XMFLOAT2 leftEye, XMFLOAT2 rightEye ) {
+    assert(index>=0 && index < MAX_PLAYER_NUM );
+    m_forces[index].leftEye = leftEye;
+    m_forces[index].rightEye = rightEye;
+}
+void Game::GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye ) {
+    assert(index>=0 && index < MAX_PLAYER_NUM );    
+    *leftEye = m_forces[index].leftEye;
+    *rightEye = m_forces[index].rightEye;
+}
 
 ////////////////////
