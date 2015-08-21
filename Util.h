@@ -3,6 +3,9 @@
 inline float maxf( float a, float b ){
     return (a>b) ? a:b;
 }
+inline float minf( float a, float b ){
+    return (a<b) ? a:b;
+}
 inline float maxf( float a, float b, float c ) {
     return maxf( maxf(a,b), c );
 }
