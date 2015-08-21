@@ -147,7 +147,7 @@ void Game::InitGameWorld() {
     int n = 200;
 	for(int i=0; i<n; i++){
 		cpFloat mass = 0.1f, eye_mass = 10.0f;
-		cpFloat radius = 10.0f;
+		cpFloat radius = cpflerp(CELL_RADIUS_MIN, CELL_RADIUS_MAX, frand() );
         int group_id = i % 2;
         int eye_id = -1;
         float pcminx,pcmaxx;
@@ -182,7 +182,8 @@ void Game::InitGameWorld() {
 		cpShapeSetCollisionType(shape, COLLISION_TYPE_STICKY);
 
         if( eye_id == 0 ) lefteyes[group_id] = body;
-        else if( eye_id == 1 ) righteyes[group_id] = body;        
+        else if( eye_id == 1 ) righteyes[group_id] = body;
+        bs->radius = radius;
 	}
     // add springs between eyes
     cpSpaceAddConstraint( m_space, new_spring( lefteyes[0], righteyes[0], cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );
@@ -381,13 +382,13 @@ void DrawBody( cpBody *body, Game *game ) {
     //    print( "id:%d g:%d xy:%f,%f", bs->id, bs->group_id, dxtkPos.x, dxtkPos.y );
     if( bs->eye_id >= 0 ) {
         XMFLOAT4 eyeCol = XMFLOAT4( bs->force,0.2,0.2,1);
-        DrawCircle( game->GetPrimBatch(), dxtkPos, 20, groupCol );
-        DrawCircle( game->GetPrimBatch(), dxtkPos, 20-4, eyeCol );
+        DrawCircle( game->GetPrimBatch(), dxtkPos, bs->radius, groupCol );
+        DrawCircle( game->GetPrimBatch(), dxtkPos, bs->radius-3, eyeCol );
     } else {        
         float hprate = bs->GetHPRate();
         XMFLOAT4 cellCol( groupCol.x * hprate, groupCol.y * hprate, groupCol.z * hprate, 1.0f );
         
-        DrawCircle( game->GetPrimBatch(), dxtkPos, 20, cellCol );
+        DrawCircle( game->GetPrimBatch(), dxtkPos, bs->radius, cellCol );
     }
     
     
