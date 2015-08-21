@@ -151,23 +151,43 @@ void Game::InitGameWorld() {
 	for(int i=0; i<n; i++){
 		cpFloat mass = 0.1f, eye_mass = 10.0f;
 		cpFloat radius = CELL_RADIUS;
-        int group_id = i % 2;
+        int group_id = i % MAX_PLAYER_NUM;
         int eye_id = -1;
-        float pcminx,pcmaxx;
+        float pcminx,pcmaxx,pcminy,pcmaxy;
+
+        assert( MAX_PLAYER_NUM==4);        
         if( group_id == 0 ) {
             pcminx = minx+20;
             pcmaxx = -50;
-        } else {
+            pcminy = miny;
+            pcmaxy = -50;
+        } else if( group_id == 1 ){
+            pcminx = minx+20;
+            pcmaxx = -50;
+            pcminy = 50;
+            pcmaxy = maxy-20;
+        } else if( group_id == 2 ) {
             pcminx = 50;
             pcmaxx = maxx-20;
+            pcminy = miny;
+            pcmaxy = -50;
+        } else if( group_id == 3 ) {
+            pcminx = 50;
+            pcmaxx = maxx-20;
+            pcminy = 50;
+            pcmaxy = maxy-20;            
         }
         
-        // player 0 eyes
-        if( i == (n-4) ) eye_id = 0; 
-        if( i == (n-2) ) eye_id = 1;
-        // player 1 eyes
-        if( i == (n-3) ) eye_id = 0;
-        if( i == (n-1) ) eye_id = 1;
+        // player eyes
+        assert( MAX_PLAYER_NUM==4);
+        if(i==n-1) eye_id = 0;
+        if(i==n-1-MAX_PLAYER_NUM) eye_id = 1;
+        if(i==n-2) eye_id = 0;
+        if(i==n-2-MAX_PLAYER_NUM) eye_id = 1;
+        if(i==n-3) eye_id = 0;
+        if(i==n-3-MAX_PLAYER_NUM) eye_id = 1;
+        if(i==n-4) eye_id = 0;
+        if(i==n-4-MAX_PLAYER_NUM) eye_id = 1;
         
         BodyState *bs = new BodyState(i,group_id,eye_id, this);
 
@@ -175,8 +195,8 @@ void Game::InitGameWorld() {
         if( eye_id >= 0 ) m = eye_mass;
         
 		cpBody *body = cpSpaceAddBody(m_space, cpBodyNew( m, cpMomentForCircle(mass, 0.0f, radius, cpvzero)));
-        cpVect p = cpv( cpflerp(pcminx, pcmaxx, frand()), cpflerp(miny, maxy, frand() ) );
-        print("%d: %f,%f   minmax:%f,%f", i, p.x, p.y, pcminx, pcmaxx );
+        cpVect p = cpv( cpflerp(pcminx, pcmaxx, frand()), cpflerp(pcminy, pcmaxy, frand() ) );
+        print("%d: %.1f,%.1f  eye:%d gr:%d", i, p.x, p.y, eye_id, group_id );
 		cpBodySetPosition(body, p);
         cpBodySetUserData(body, bs);
         
@@ -190,8 +210,9 @@ void Game::InitGameWorld() {
         bs->hp = BODY_MAXHP * cpflerp( 0.7, 1.0, frand() );
 	}
     // add springs between eyes
-    cpSpaceAddConstraint( m_space, new_spring( lefteyes[0], righteyes[0], cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );
-    cpSpaceAddConstraint( m_space, new_spring( lefteyes[1], righteyes[1], cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );    
+    for(int i=0;i<MAX_PLAYER_NUM;i++) {
+        cpSpaceAddConstraint( m_space, new_spring( lefteyes[i], righteyes[i], cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );
+    }
 
 	
 	cpCollisionHandler *handler = cpSpaceAddWildcardHandler(m_space, COLLISION_TYPE_STICKY);

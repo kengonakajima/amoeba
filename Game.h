@@ -135,6 +135,7 @@ private:
     // Game state
     DX::StepTimer                                   m_timer;
 	int m_framecnt;
+    int m_cellCounts[MAX_PLAYER_NUM];
 
 	// Show status logs
 	SpriteBatch *m_spriteBatch;
