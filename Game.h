@@ -5,6 +5,8 @@
 #pragma once
 
 
+#include "chipmunk/chipmunk.h"
+
 #include "StepTimer.h"
 #include "SpriteFont.h"
 #include "VertexTypes.h"
@@ -95,6 +97,7 @@ public:
     }
     void SetCreatureForce( int index, XMFLOAT2 leftEye, XMFLOAT2 rightEye );
     void GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye );
+    cpSpace *GetSpace() { return m_space; };
     
 private:
 

@@ -32,8 +32,10 @@ public:
     int group_id;
     int eye_id; // -1 for normal, 0,1 for eyes (left/right joystick)
     float force;
+    float hp;
+#define BODY_MAXHP 100
     Game *game;
-	BodyState(int id, int gid, int eye_id, Game *game) : id(id), group_id(gid), eye_id(eye_id), force(0), game(game) {};
+	BodyState(int id, int gid, int eye_id, Game *game) : id(id), group_id(gid), eye_id(eye_id), force(0), hp(BODY_MAXHP), game(game) {};
 };
 
 

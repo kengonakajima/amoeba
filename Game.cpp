@@ -143,8 +143,9 @@ void Game::InitGameWorld() {
 
     cpBody *lefteyes[MAX_PLAYER_NUM], *righteyes[MAX_PLAYER_NUM];
     for(int i=0;i<MAX_PLAYER_NUM;i++) lefteyes[i] = righteyes[i] = NULL;
-    
-	for(int i=0; i<200; i++){
+
+    int n = 200;
+	for(int i=0; i<n; i++){
 		cpFloat mass = 0.1f, eye_mass = 10.0f;
 		cpFloat radius = 10.0f;
         int group_id = i % 2;
@@ -159,11 +160,11 @@ void Game::InitGameWorld() {
         }
         
         // player 0 eyes
-        if( i == 196 ) eye_id = 0; 
-        if( i == 198 ) eye_id = 1;
+        if( i == (n-4) ) eye_id = 0; 
+        if( i == (n-2) ) eye_id = 1;
         // player 1 eyes
-        if( i == 197 ) eye_id = 0;
-        if( i == 199 ) eye_id = 1;
+        if( i == (n-3) ) eye_id = 0;
+        if( i == (n-1) ) eye_id = 1;
         
         BodyState *bs = new BodyState(i,group_id,eye_id, this);
 
@@ -205,36 +206,104 @@ void Game::Tick()
     Render();
 }
 
-void eachBodyForceUpdateCallback( cpBody *body, void *data ) {
+
+
+//////////////////////
+
+static void ShapeFreeWrap(cpSpace *space, cpShape *shape, void *unused){
+	cpSpaceRemoveShape(space, shape);
+	cpShapeFree(shape);
+}
+
+static void PostShapeFree(cpShape *shape, cpSpace *space){
+	cpSpaceAddPostStepCallback(space, (cpPostStepFunc)ShapeFreeWrap, shape, NULL);
+}
+
+static void ConstraintFreeWrap(cpSpace *space, cpConstraint *constraint, void *unused){
+	cpSpaceRemoveConstraint(space, constraint);
+	cpConstraintFree(constraint);
+}
+
+static void PostConstraintFree(cpConstraint *constraint, cpSpace *space){
+	cpSpaceAddPostStepCallback(space, (cpPostStepFunc)ConstraintFreeWrap, constraint, NULL);
+}
+
+static void BodyFreeWrap(cpSpace *space, cpBody *body, void *unused){
+	cpSpaceRemoveBody(space, body);
+	cpBodyFree(body);
+}
+
+static void PostBodyFree(cpBody *body, cpSpace *space){
+	cpSpaceAddPostStepCallback(space, (cpPostStepFunc)BodyFreeWrap, body, NULL);
+}
+
+
+void eachShapeDeleteCallback( cpBody *body, cpShape *shape, void *data ) {
+    print("eachShapeDeleteCallback shape:%p body:%p", shape, body );
+    Game *game = (Game*) data;
+    PostShapeFree( shape, game->GetSpace());
+}
+void eachConstraintDeleteCallback( cpBody *body, cpConstraint *ct, void *data ) {
+    print("eachConstraintDeleteCallback: ct:%p body:%p", ct, body );
+    Game *game = (Game*) data;
+    PostConstraintFree( ct, game->GetSpace() );
+}
+
+
+void eachBodyGameUpdateCallback( cpBody *body, void *data ) {
     BodyState *bs = (BodyState*) cpBodyGetUserData(body);
     Game *game = (Game*) data;
 
-    if( bs->eye_id < 0 ) return;
-    int player_index = bs->group_id;
-    int force_index = bs->eye_id;
-
-    XMFLOAT2 l,r;
-    game->GetCreatureForce( player_index, &l, &r );
-
-    float scl = 10000;
-    cpVect f;
-    if( force_index == 0 ) { 
-        //        print("setforce L: %d g:%d e:%d %f %f", bs->id, player_index, force_index, l.x, l.y );
-        f = cpv( l.x * scl, l.y * scl );
-        bs->force = len( l.x, l.y );
+    if( bs->eye_id < 0 ) {
+        bs->hp -= 0.5;
+        if( bs->hp < 0 ) {
+            //            cpSpaceAddPostStepCallback( game->GetSpace(), postStepRemoveBodyCallback, body, game );
+            print("eachBodyGameUpdateCallback: removing body:%p", body );
+            cpBodyEachShape(body, eachShapeDeleteCallback, data );
+            cpBodyEachConstraint(body, eachConstraintDeleteCallback, data );
+            PostBodyFree( body, game->GetSpace());
+            return;
+        }
     } else {
-        //        print("setforce R: %d g:%d e:%d %f %f", bs->id, player_index, force_index, r.x, r.y );
-        f = cpv( r.x * scl, r.y * scl );
-        bs->force = len( r.x, r.y );
-        //        cpBodySetTorque( body, len(f.x,f.y)*10 );
-    }
+        int player_index = bs->group_id;
+        int force_index = bs->eye_id;
+
+        XMFLOAT2 l,r;
+        game->GetCreatureForce( player_index, &l, &r );
+
+        float scl = 10000;
+        cpVect f;
+        if( force_index == 0 ) { 
+            //        print("setforce L: %d g:%d e:%d %f %f", bs->id, player_index, force_index, l.x, l.y );
+            f = cpv( l.x * scl, l.y * scl );
+            bs->force = len( l.x, l.y );
+        } else {
+            //        print("setforce R: %d g:%d e:%d %f %f", bs->id, player_index, force_index, r.x, r.y );
+            f = cpv( r.x * scl, r.y * scl );
+            bs->force = len( r.x, r.y );
+            //        cpBodySetTorque( body, len(f.x,f.y)*10 );
+        }
 
         cpBodySetForce( body, f );        
-    
 
-    //    cpVect v = cpBodyGetVelocity( body );
-    //    cpBodySetVelocity( body, cpv( v.x + f.x/1000, v.y + f.y/1000) );
+        // Eyes keep max HP 
+        bs->hp = BODY_MAXHP;
+        //    cpVect v = cpBodyGetVelocity( body );
+        //    cpBodySetVelocity( body, cpv( v.x + f.x/1000, v.y + f.y/1000) );        
+    }
+
 }
+
+void eachConstraintGameUpdateCallback( cpConstraint *ct, void *data )  {
+    cpBody *bodyA = cpConstraintGetBodyA(ct);
+    cpBody *bodyB = cpConstraintGetBodyB(ct);
+
+    BodyState *bsA = (BodyState*) cpBodyGetUserData(bodyA);
+    BodyState *bsB = (BodyState*) cpBodyGetUserData(bodyB);
+
+    if( bsA->id == 199 ) print("bsA:%d bsB:%d hpA:%f hpB:%f", bsA->id, bsB->id, bsA->hp, bsB->hp );
+}
+
 // Updates the world
 void Game::Update(DX::StepTimer const& timer)
 {
@@ -266,8 +335,8 @@ void Game::Update(DX::StepTimer const& timer)
                               );
         }
     }
-
-    cpSpaceEachBody( m_space, eachBodyForceUpdateCallback, (void*) this );    
+    cpSpaceEachConstraint( m_space, eachConstraintGameUpdateCallback, this );    
+    cpSpaceEachBody( m_space, eachBodyGameUpdateCallback, (void*) this );
 }
 
 // Draws the scene
@@ -348,7 +417,7 @@ void Game::Render()
     m_primBatch->DrawLine( VertexPositionColor( XMFLOAT3(10,10,0), XMFLOAT4(1,0,1,1)),
                            VertexPositionColor( XMFLOAT3(100,200,0), XMFLOAT4(1,1,0,1)) );
 
-    XMFLOAT4 col = GetPlayerColor( irange(0,5) );
+    XMFLOAT4 col = GetPlayerColor( irange(0,MAX_PLAYER_NUM) );
     XMFLOAT3 cirpos( range(0,500), range(0,300),0 );
     
     DrawCircle( m_primBatch, cirpos, range(10,50), col );
