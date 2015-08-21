@@ -89,6 +89,9 @@ void Game::Initialize(HWND window)
     m_cellAnimTex = new AnimatedTexture( XMFLOAT2(0,0), 0.f, 2.f, 0.5f );
     m_cellAnimTex->Load( cell.Get(), 4, 2 );
 
+    hr = CreateDDSTextureFromFile( m_d3dDevice.Get(), L"assets\\wave.dds", nullptr, m_bgTex.GetAddressOf(), alphamode );
+    DX::ThrowIfFailed(hr);    
+    
 	// This is only needed in Win32 desktop apps
 	CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 	AUDIO_ENGINE_FLAGS eflags = AudioEngine_Default;
@@ -144,10 +147,10 @@ void Game::InitGameWorld() {
     cpBody *lefteyes[MAX_PLAYER_NUM], *righteyes[MAX_PLAYER_NUM];
     for(int i=0;i<MAX_PLAYER_NUM;i++) lefteyes[i] = righteyes[i] = NULL;
 
-    int n = 200;
+    int n = 300;
 	for(int i=0; i<n; i++){
 		cpFloat mass = 0.1f, eye_mass = 10.0f;
-		cpFloat radius = cpflerp(CELL_RADIUS_MIN, CELL_RADIUS_MAX, frand() );
+		cpFloat radius = CELL_RADIUS;
         int group_id = i % 2;
         int eye_id = -1;
         float pcminx,pcmaxx;
@@ -184,6 +187,7 @@ void Game::InitGameWorld() {
         if( eye_id == 0 ) lefteyes[group_id] = body;
         else if( eye_id == 1 ) righteyes[group_id] = body;
         bs->radius = radius;
+        bs->hp = BODY_MAXHP * cpflerp( 0.7, 1.0, frand() );
 	}
     // add springs between eyes
     cpSpaceAddConstraint( m_space, new_spring( lefteyes[0], righteyes[0], cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );
@@ -419,8 +423,65 @@ void Game::Render()
 
     Clear();
 
-    // Sprites
     CommonStates states(m_d3dDevice.Get());
+    // Background
+	m_spriteBatch->Begin( SpriteSortMode_Deferred, states.NonPremultiplied() );
+    RECT bgrect;
+    bgrect.left = 0;
+    bgrect.top = 0;
+    size_t w,h;
+    GetDefaultSize( w,h);
+    bgrect.right = w;
+    bgrect.bottom = h;
+    
+    m_spriteBatch->Draw( m_bgTex.Get(), XMFLOAT2(0,0), &bgrect, DirectX::Colors::Gray,
+                         0, /* rot*/
+                         XMFLOAT2(0,0), /*origin*/
+                         XMFLOAT2(2,2), /*scale*/
+                         DirectX::SpriteEffects_None,
+                         0 /*depth*/
+                         );
+    //        batch->Draw( mTexture.Get(), screenPos, &sourceRect, DirectX::Colors::White,
+    //                     mRotation, mOrigin, mScale, DirectX::SpriteEffects_None, mDepth );
+    
+    m_spriteBatch->End();
+    
+    
+    // Prims
+
+    m_d3dContext->OMSetBlendState( states.Opaque(), nullptr, 0xffffffff );
+    m_d3dContext->OMSetDepthStencilState( states.DepthNone(), 0 );
+    m_d3dContext->RSSetState( states.CullCounterClockwise() );
+
+    m_basicEffect->Apply( m_d3dContext.Get() );
+    m_d3dContext->IASetInputLayout( m_inputLayout.Get() );
+
+    m_primBatch->Begin();
+#if 0    
+    m_primBatch->DrawLine( VertexPositionColor( XMFLOAT3(10,10,0), XMFLOAT4(1,0,1,1)),
+                           VertexPositionColor( XMFLOAT3(100,200,0), XMFLOAT4(1,1,0,1)) );
+#endif
+#if 0    
+    XMFLOAT4 col = GetPlayerColor( irange(0,MAX_PLAYER_NUM) );
+    XMFLOAT3 cirpos( range(0,500), range(0,300),0 );
+    
+    DrawCircle( m_primBatch, cirpos, range(10,50), col );
+    DrawCircle( m_primBatch, XMFLOAT3(cirpos.x+50,cirpos.y+50,0), range(10,50), col );    
+#endif
+
+    // cells
+    std::vector<cpBody*> to_sort_body;
+    cpSpaceEachBody( m_space, eachBodyPushCallback, (void*) &to_sort_body );
+    SortBodiesById( to_sort_body );
+    for(int i=0;i<to_sort_body.size();i++){
+        cpBody *body = to_sort_body[i];
+        DrawBody(body, this);
+    }
+    m_primBatch->End();
+
+
+    // Sprites
+    
 	m_spriteBatch->Begin( SpriteSortMode_Deferred, states.NonPremultiplied() );
 
 	TCHAR statmsg[100];
@@ -435,36 +496,9 @@ void Game::Render()
     XMFLOAT2 pos(100,100);
     m_cellAnimTex->Draw( m_spriteBatch, pos );
 
-
-	m_spriteBatch->End();
-
-    // Prims
-
-    m_d3dContext->OMSetBlendState( states.Opaque(), nullptr, 0xffffffff );
-    m_d3dContext->OMSetDepthStencilState( states.DepthNone(), 0 );
-    m_d3dContext->RSSetState( states.CullCounterClockwise() );
-
-    m_basicEffect->Apply( m_d3dContext.Get() );
-    m_d3dContext->IASetInputLayout( m_inputLayout.Get() );
-
-    m_primBatch->Begin();
-    m_primBatch->DrawLine( VertexPositionColor( XMFLOAT3(10,10,0), XMFLOAT4(1,0,1,1)),
-                           VertexPositionColor( XMFLOAT3(100,200,0), XMFLOAT4(1,1,0,1)) );
-
-    XMFLOAT4 col = GetPlayerColor( irange(0,MAX_PLAYER_NUM) );
-    XMFLOAT3 cirpos( range(0,500), range(0,300),0 );
     
-    DrawCircle( m_primBatch, cirpos, range(10,50), col );
-    DrawCircle( m_primBatch, XMFLOAT3(cirpos.x+50,cirpos.y+50,0), range(10,50), col );    
-
-    std::vector<cpBody*> to_sort_body;
-    cpSpaceEachBody( m_space, eachBodyPushCallback, (void*) &to_sort_body );
-    SortBodiesById( to_sort_body );
-    for(int i=0;i<to_sort_body.size();i++){
-        cpBody *body = to_sort_body[i];
-        DrawBody(body, this);
-    }
-    m_primBatch->End();
+                         
+	m_spriteBatch->End();
     
 
     Present();

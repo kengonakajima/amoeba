@@ -28,8 +28,7 @@ using Microsoft::WRL::ComPtr;
 
 #define MAX_PLAYER_NUM 4
 #define HP_CONSUME_SPEED 0.2
-#define CELL_RADIUS_MIN 10.0f
-#define CELL_RADIUS_MAX 20.0f
+#define CELL_RADIUS 10.0f
 
 //////////////
 
@@ -144,8 +143,9 @@ private:
     BasicEffect *m_basicEffect;
     ComPtr<ID3D11InputLayout> m_inputLayout;
     
-    // game sprites
+    // game sprites, textures
     AnimatedTexture *m_cellAnimTex;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_bgTex;
 
     // chipmunk related
     struct cpSpace *m_space;
