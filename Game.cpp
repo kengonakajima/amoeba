@@ -60,7 +60,7 @@ void Game::Initialize(HWND window)
     m_timer.SetTargetElapsedSeconds(1.0 / 60);
     */
 	m_spriteBatch = new SpriteBatch(m_d3dContext.Get());
-	m_spriteFont = new SpriteFont( m_d3dDevice.Get(), L"assets\\tahoma32.spritefont");
+	m_spriteFont = new SpriteFont( m_d3dDevice.Get(), L"assets\\tahoma9.spritefont");
     m_primBatch = new PrimitiveBatch<VertexPositionColor>(m_d3dContext.Get());
 
     m_basicEffect = new BasicEffect(m_d3dDevice.Get() );
@@ -280,7 +280,7 @@ void eachConstraintDeleteCallback( cpBody *body, cpConstraint *ct, void *data ) 
 void eachBodyGameUpdateCallback( cpBody *body, void *data ) {
     BodyState *bs = (BodyState*) cpBodyGetUserData(body);
     Game *game = (Game*) data;
-
+    game->IncrementCellCount(bs->group_id);
     if( bs->eye_id < 0 ) {
         bs->hp -= HP_CONSUME_SPEED;
         if( bs->hp < 0 ) {
@@ -371,7 +371,8 @@ void Game::Update(DX::StepTimer const& timer)
                               );
         }
     }
-    cpSpaceEachConstraint( m_space, eachConstraintGameUpdateCallback, this );    
+    cpSpaceEachConstraint( m_space, eachConstraintGameUpdateCallback, this );
+    for(int i=0;i<MAX_PLAYER_NUM;i++) m_cellCounts[i]=0;
     cpSpaceEachBody( m_space, eachBodyGameUpdateCallback, (void*) this );
 }
 
@@ -509,15 +510,23 @@ void Game::Render()
 	wsprintf(statmsg, L"Frame: %d", m_framecnt);
 	m_spriteFont->DrawString(m_spriteBatch, statmsg, XMFLOAT2(10, 10));
 
-	m_spriteFont->DrawString(m_spriteBatch, L"Skeleton code for 1:1 games", XMFLOAT2(100, 100));
+    for(int i=0;i<MAX_PLAYER_NUM;i++) {
+        TCHAR nummsg[100];
+        wsprintf( nummsg, L"P%d:%d", i, m_cellCounts[i] );
+
+        DirectX::FXMVECTOR color = DirectX::Colors::White;
+        m_spriteFont->DrawString( m_spriteBatch, nummsg, XMFLOAT2(300 + i * 150 ,10), color );
+    }
+#if 0
+	m_spriteFont->DrawString(m_spriteBatch, L"Skeleton code for 1:1 games", XMFLOAT2(100, 100) );
 	m_spriteFont->DrawString(m_spriteBatch, L"Press P to play sound effect", XMFLOAT2(130, 160));
 	m_spriteFont->DrawString(m_spriteBatch, L"Press Q to quit", XMFLOAT2(130, 200));
+#endif
 
-
+#if 0    
     XMFLOAT2 pos(100,100);
     m_cellAnimTex->Draw( m_spriteBatch, pos );
-
-    
+#endif    
                          
 	m_spriteBatch->End();
     
@@ -854,4 +863,9 @@ void Game::GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye ) 
 void Game::onBodySeparated() {
     m_brokenSE->Play();
 }
+void Game::IncrementCellCount( int groupid ) {
+    assert( groupid >= 0 && groupid < MAX_PLAYER_NUM );
+    m_cellCounts[groupid] ++;
+}
+
 ////////////////////

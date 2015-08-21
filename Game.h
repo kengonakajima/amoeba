@@ -102,6 +102,7 @@ public:
     cpSpace *GetSpace() { return m_space; };
 
     void onBodySeparated();
+    void IncrementCellCount( int groupid );
     
 private:
 
