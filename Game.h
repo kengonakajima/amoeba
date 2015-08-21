@@ -101,6 +101,8 @@ public:
     void SetCreatureForce( int index, XMFLOAT2 leftEye, XMFLOAT2 rightEye );
     void GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye );
     cpSpace *GetSpace() { return m_space; };
+
+    void onBodySeparated();
     
 private:
 
@@ -149,7 +151,7 @@ private:
     struct cpSpace *m_space;
 
 	AudioEngine *m_audioEngine;
-	SoundEffect *m_soundEffect;
+	SoundEffect *m_brokenSE, *m_damageSE;
 
     // Movement
     CreatureForce m_forces[MAX_PLAYER_NUM];

@@ -3,7 +3,7 @@
 #include "chipmunk/chipmunk.h"
 
 #include "Phys.h"
-
+#include "Game.h"
 
 
 
@@ -106,6 +106,11 @@ void StickySeparate(cpArbiter *arb, cpSpace *space, void *data)
 		// NULL out the reference to the joint.
 		// Not required, but it's a good practice.
 		cpArbiterSetUserData(arb, NULL);
+
+        cpBody *bodyA = cpConstraintGetBodyA(joint);
+        BodyState *bs = (BodyState*) cpBodyGetUserData(bodyA);
+        Game *game = bs->game;
+        game->onBodySeparated();
 	}
 }
 

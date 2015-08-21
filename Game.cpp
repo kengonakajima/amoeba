@@ -96,8 +96,8 @@ void Game::Initialize(HWND window)
 	eflags = eflags | AudioEngine_Debug;
 #endif
 	m_audioEngine = new AudioEngine(eflags);
-	m_soundEffect = new SoundEffect(m_audioEngine, L"assets\\coinget.wav");
-	m_soundEffect->Play();
+	m_damageSE = new SoundEffect(m_audioEngine, L"assets\\hit_soft.wav");
+	m_brokenSE = new SoundEffect(m_audioEngine, L"assets\\hagareta.wav");
 
 
     // chipmunk
@@ -536,8 +536,8 @@ void Game::OnWindowSizeChanged()
 void Game::GetDefaultSize(size_t& width, size_t& height) const
 {
     // TODO: Change to desired default window size (note minimum size is 320x200)
-    width = 800;
-    height = 600;
+    width = 1280;
+    height = 768;
 }
 
 // These are the resources that depend on the device.
@@ -768,7 +768,7 @@ void Game::OnKeydown(int keycode) {
 	OutputDebugString(s);
 
 	if (keycode == 'Q' ) exit(0); 
-	if (keycode == 'P') m_soundEffect->Play();
+	if (keycode == 'P') m_brokenSE->Play();
 }
 
 
@@ -796,4 +796,7 @@ void Game::GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye ) 
     *rightEye = m_forces[index].rightEye;
 }
 
+void Game::onBodySeparated() {
+    m_brokenSE->Play();
+}
 ////////////////////
