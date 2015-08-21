@@ -36,6 +36,7 @@ public:
 #define BODY_MAXHP 100
     Game *game;
 	BodyState(int id, int gid, int eye_id, Game *game) : id(id), group_id(gid), eye_id(eye_id), force(0), hp(BODY_MAXHP), game(game) {};
+    float GetHPRate() { return hp / (float)BODY_MAXHP; }
 };
 
 

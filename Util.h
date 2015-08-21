@@ -50,3 +50,12 @@ inline float len(float x0, float y0, float x1, float y1 ){
 inline float len(float x, float y ) {
     return sqrt( x*x + y*y);
 }
+
+class SorterEntry {
+public:
+    float val;
+    void *ptr;
+    SorterEntry(float v, void *p) : val(v), ptr(p){}
+    SorterEntry() : val(0), ptr(0) {}
+};
+void quickSortF(SorterEntry array[], int left ,int right);

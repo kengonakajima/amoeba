@@ -229,6 +229,7 @@ static void PostConstraintFree(cpConstraint *constraint, cpSpace *space){
 }
 
 static void BodyFreeWrap(cpSpace *space, cpBody *body, void *unused){
+    print("BODYFREEWRAP %p", body );
 	cpSpaceRemoveBody(space, body);
 	cpBodyFree(body);
 }
@@ -255,7 +256,7 @@ void eachBodyGameUpdateCallback( cpBody *body, void *data ) {
     Game *game = (Game*) data;
 
     if( bs->eye_id < 0 ) {
-        bs->hp -= 0.5;
+        bs->hp -= HP_CONSUME_SPEED;
         if( bs->hp < 0 ) {
             //            cpSpaceAddPostStepCallback( game->GetSpace(), postStepRemoveBodyCallback, body, game );
             print("eachBodyGameUpdateCallback: removing body:%p", body );
@@ -301,7 +302,16 @@ void eachConstraintGameUpdateCallback( cpConstraint *ct, void *data )  {
     BodyState *bsA = (BodyState*) cpBodyGetUserData(bodyA);
     BodyState *bsB = (BodyState*) cpBodyGetUserData(bodyB);
 
-    if( bsA->id == 199 ) print("bsA:%d bsB:%d hpA:%f hpB:%f", bsA->id, bsB->id, bsA->hp, bsB->hp );
+    //   if( bsA->id == 199 ) print("bsA:%d bsB:%d hpA:%f hpB:%f", bsA->id, bsB->id, bsA->hp, bsB->hp );
+    
+    {
+        if( bsA->group_id == bsB->group_id ) {
+            // exchange hp
+            float total = bsA->hp + bsB->hp;
+            float average = total / 2.0f;
+            bsA->hp = bsB->hp = average;
+        }
+    }
 }
 
 // Updates the world
@@ -356,9 +366,8 @@ void DrawCircle( PrimitiveBatch<VertexPositionColor> *pb, XMFLOAT3 pos, float di
 }
 
 
-void eachBodyDrawCallback( cpBody *body, void *data ) {
+void DrawBody( cpBody *body, Game *game ) {
     BodyState *bs = (BodyState*) cpBodyGetUserData(body);
-    Game *game = (Game*) data;
 
     cpVect cppos = cpBodyGetPosition(body);
 
@@ -367,15 +376,39 @@ void eachBodyDrawCallback( cpBody *body, void *data ) {
     size_t scrw, scrh;
     game->GetDefaultSize(scrw,scrh);
     XMFLOAT3 dxtkPos( cppos.x+scrw/2, - cppos.y + scrh/2, 0 );
-    XMFLOAT4 dxtkCol = Game::GetPlayerColor( bs->group_id );
+    XMFLOAT4 groupCol = Game::GetPlayerColor( bs->group_id );
+    
     //    print( "id:%d g:%d xy:%f,%f", bs->id, bs->group_id, dxtkPos.x, dxtkPos.y );
     if( bs->eye_id >= 0 ) {
-        dxtkCol = XMFLOAT4( bs->force,0.2,0.2,1);
+        XMFLOAT4 eyeCol = XMFLOAT4( bs->force,0.2,0.2,1);
+        DrawCircle( game->GetPrimBatch(), dxtkPos, 20, groupCol );
+        DrawCircle( game->GetPrimBatch(), dxtkPos, 20-4, eyeCol );
+    } else {        
+        float hprate = bs->GetHPRate();
+        XMFLOAT4 cellCol( groupCol.x * hprate, groupCol.y * hprate, groupCol.z * hprate, 1.0f );
+        
+        DrawCircle( game->GetPrimBatch(), dxtkPos, 20, cellCol );
     }
-    DrawCircle( game->GetPrimBatch(), dxtkPos, 20, dxtkCol );
+    
     
 }
-
+void eachBodyPushCallback( cpBody *body, void *data ) {
+    std::vector<cpBody*> *v = (std::vector<cpBody*>*)data;
+    v->push_back(body);
+}
+void SortBodiesById( std::vector<cpBody*> &vec ) {
+    SorterEntry ents[1024];
+    assert( vec.size() <= 1024 );
+    for(int i=0; i<vec.size();i++ ) {
+        ents[i].ptr = vec[i];
+        BodyState *bs = (BodyState*) cpBodyGetUserData( vec[i] );
+        ents[i].val = bs->id;
+    }
+    quickSortF( ents, 0, vec.size()-1);    
+    for(int i=0;i<vec.size();i++) {
+        vec[i] = (cpBody*) ents[i].ptr;
+    }    
+}
 void Game::Render()
 {
 	m_framecnt++;
@@ -423,8 +456,13 @@ void Game::Render()
     DrawCircle( m_primBatch, cirpos, range(10,50), col );
     DrawCircle( m_primBatch, XMFLOAT3(cirpos.x+50,cirpos.y+50,0), range(10,50), col );    
 
-    cpSpaceEachBody( m_space, eachBodyDrawCallback, (void*) this );
-    
+    std::vector<cpBody*> to_sort_body;
+    cpSpaceEachBody( m_space, eachBodyPushCallback, (void*) &to_sort_body );
+    SortBodiesById( to_sort_body );
+    for(int i=0;i<to_sort_body.size();i++){
+        cpBody *body = to_sort_body[i];
+        DrawBody(body, this);
+    }
     m_primBatch->End();
     
 

@@ -27,6 +27,7 @@ using Microsoft::WRL::ComPtr;
 
 
 #define MAX_PLAYER_NUM 4
+#define HP_CONSUME_SPEED 0.2
 
 //////////////
 
