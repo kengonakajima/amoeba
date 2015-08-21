@@ -66,7 +66,7 @@ void Game::Initialize(HWND window)
     m_basicEffect = new BasicEffect(m_d3dDevice.Get() );
     size_t scrw, scrh;
     GetDefaultSize(scrw,scrh);    
-    m_basicEffect->SetProjection( XMMatrixOrthographicOffCenterRH(0, scrw, scrh, 0,0,1 ) );
+    m_basicEffect->SetProjection( XMMatrixOrthographicOffCenterRH(0, (float)scrw, (float)scrh, 0,0,1 ) );
     m_basicEffect->SetVertexColorEnabled(true);
 
     void const* shaderByteCode;
@@ -123,7 +123,8 @@ void Game::InitGameWorld() {
     size_t w,h;
     GetDefaultSize(w,h);
 
-    float minx = -(float)w/2, maxx = w/2, miny = -(float)h/2, maxy = h/2;
+    float mgn=30;
+    float minx = -(float)w/2+mgn, maxx = w/2-mgn, miny = -(float)h/2+mgn, maxy = h/2-mgn;
 	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv(minx,miny), cpv(minx, maxy), 20.0f)); // left
 	cpShapeSetElasticity(shape, 1.0f);
 	cpShapeSetFriction(shape, 1.0f);
@@ -144,13 +145,12 @@ void Game::InitGameWorld() {
 	cpShapeSetFriction(shape, 1.0f);
 	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
 
-    cpBody *lefteyes[MAX_PLAYER_NUM], *righteyes[MAX_PLAYER_NUM];
-    for(int i=0;i<MAX_PLAYER_NUM;i++) lefteyes[i] = righteyes[i] = NULL;
+    
+    for(int i=0;i<MAX_PLAYER_NUM;i++) m_lefteyes[i] = m_righteyes[i] = NULL;
 
-    int n = 300;
+    int n = TOTAL_CELL_NUM;
 	for(int i=0; i<n; i++){
-		cpFloat mass = 0.1f, eye_mass = 10.0f;
-		cpFloat radius = CELL_RADIUS;
+
         int group_id = i % MAX_PLAYER_NUM;
         int eye_id = -1;
         float pcminx,pcmaxx,pcminy,pcmaxy;
@@ -188,37 +188,49 @@ void Game::InitGameWorld() {
         if(i==n-3-MAX_PLAYER_NUM) eye_id = 1;
         if(i==n-4) eye_id = 0;
         if(i==n-4-MAX_PLAYER_NUM) eye_id = 1;
-        
-        BodyState *bs = new BodyState(i,group_id,eye_id, this);
 
-        cpFloat m = mass;
-        if( eye_id >= 0 ) m = eye_mass;
-        
-		cpBody *body = cpSpaceAddBody(m_space, cpBodyNew( m, cpMomentForCircle(mass, 0.0f, radius, cpvzero)));
+        int prio;
+        if( eye_id >= 0 ) prio = CELL_PRIO_HIGH; else prio = CELL_PRIO_LOW; // draw eyes always on other cells
+        BodyState *bs = new BodyState(prio,group_id,eye_id, this);
+
         cpVect p = cpv( cpflerp(pcminx, pcmaxx, frand()), cpflerp(pcminy, pcmaxy, frand() ) );
-        print("%d: %.1f,%.1f  eye:%d gr:%d", i, p.x, p.y, eye_id, group_id );
-		cpBodySetPosition(body, p);
-        cpBodySetUserData(body, bs);
-        
-		cpShape *shape = cpSpaceAddShape(m_space, cpCircleShapeNew(body, radius + STICK_SENSOR_THICKNESS, cpvzero));
-		cpShapeSetFriction(shape, 0.95f);
-		cpShapeSetCollisionType(shape, COLLISION_TYPE_STICKY);
+        cpBody *body = CreateCellBody(p, bs, eye_id >= 0 );
 
-        if( eye_id == 0 ) lefteyes[group_id] = body;
-        else if( eye_id == 1 ) righteyes[group_id] = body;
-        bs->radius = radius;
-        bs->hp = BODY_MAXHP * cpflerp( 0.7, 1.0, frand() );
+        if( eye_id == 0 ) m_lefteyes[group_id] = body;
+        else if( eye_id == 1 ) m_righteyes[group_id] = body;
+
 	}
     // add springs between eyes
     for(int i=0;i<MAX_PLAYER_NUM;i++) {
-        cpSpaceAddConstraint( m_space, new_spring( lefteyes[i], righteyes[i], cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );
+        cpSpaceAddConstraint( m_space, new_spring( m_lefteyes[i], m_righteyes[i], cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );
     }
 
 	
 	cpCollisionHandler *handler = cpSpaceAddWildcardHandler(m_space, COLLISION_TYPE_STICKY);
 	handler->preSolveFunc = StickyPreSolve;
 	handler->separateFunc = StickySeparate;
+}
+cpBody *Game::CreateCellBody( cpVect pos, BodyState *bs, bool is_eye ) {
+    cpFloat mass = 0.1f, eye_mass = 10.0f;
+    cpFloat radius = CELL_RADIUS;
+
+    if( is_eye ) mass = eye_mass;
+
     
+    cpBody *body = cpSpaceAddBody(m_space, cpBodyNew( mass, cpMomentForCircle(mass, 0.0f, radius, cpvzero)));
+        
+    //    print("%d: %.1f,%.1f  eye:%d gr:%d", i, p.x, p.y, eye_id, group_id );
+    cpBodySetPosition(body, pos);
+    cpBodySetUserData(body, bs);
+
+    cpShape *shape = cpSpaceAddShape(m_space, cpCircleShapeNew(body, radius + STICK_SENSOR_THICKNESS, cpvzero));
+    cpShapeSetFriction(shape, 0.95f);
+    cpShapeSetCollisionType(shape, COLLISION_TYPE_STICKY);
+
+    bs->radius = radius;
+    bs->hp = BODY_MAXHP * cpflerp( 0.6, 1.0, frand() );
+
+    return body;
 }
 
 // Executes basic game loop.
@@ -257,6 +269,9 @@ static void PostConstraintFree(cpConstraint *constraint, cpSpace *space){
 static void BodyFreeWrap(cpSpace *space, cpBody *body, void *unused){
     print("BODYFREEWRAP %p", body );
 	cpSpaceRemoveBody(space, body);
+    BodyState *bs = (BodyState*) cpBodyGetUserData(body);
+    delete bs;
+    cpBodySetUserData(body,NULL);
 	cpBodyFree(body);
 }
 
@@ -301,11 +316,9 @@ void eachBodyGameUpdateCallback( cpBody *body, void *data ) {
         float scl = 10000;
         cpVect f;
         if( force_index == 0 ) { 
-            //        print("setforce L: %d g:%d e:%d %f %f", bs->id, player_index, force_index, l.x, l.y );
             f = cpv( l.x * scl, l.y * scl );
             bs->force = len( l.x, l.y );
         } else {
-            //        print("setforce R: %d g:%d e:%d %f %f", bs->id, player_index, force_index, r.x, r.y );
             f = cpv( r.x * scl, r.y * scl );
             bs->force = len( r.x, r.y );
             //        cpBodySetTorque( body, len(f.x,f.y)*10 );
@@ -327,9 +340,6 @@ void eachConstraintGameUpdateCallback( cpConstraint *ct, void *data )  {
 
     BodyState *bsA = (BodyState*) cpBodyGetUserData(bodyA);
     BodyState *bsB = (BodyState*) cpBodyGetUserData(bodyB);
-
-    //   if( bsA->id == 199 ) print("bsA:%d bsB:%d hpA:%f hpB:%f", bsA->id, bsB->id, bsA->hp, bsB->hp );
-    
     {
         if( bsA->group_id == bsB->group_id ) {
             // exchange hp
@@ -374,6 +384,34 @@ void Game::Update(DX::StepTimer const& timer)
     cpSpaceEachConstraint( m_space, eachConstraintGameUpdateCallback, this );
     for(int i=0;i<MAX_PLAYER_NUM;i++) m_cellCounts[i]=0;
     cpSpaceEachBody( m_space, eachBodyGameUpdateCallback, (void*) this );
+    for(int i=0;i<MAX_PLAYER_NUM;i++) {
+        if( m_cellCounts[i] == 2 ) {
+            // Died! Resetting..
+            ResetPlayerCells(i);            
+        }
+    }
+}
+void Game::ResetPlayerCells( int playerIndex ) {
+    cpBody *le = m_lefteyes[playerIndex];
+    cpBody *re = m_righteyes[playerIndex];
+    cpVect lv = cpBodyGetPosition(le);
+    cpVect rv = cpBodyGetPosition(re);
+    cpVect minv = cpv( minf(lv.x,rv.x), minf(lv.y,rv.y) );
+    cpVect maxv = cpv( maxf(lv.x,rv.x), maxf(lv.y,rv.y) );
+    for(int i=0;i<BODY_CELL_NUM_PER_PLAYER;i++) {
+        cpVect p = cpv( cpflerp( minv.x-300, maxv.x+300, frand() ), cpflerp( minv.y-200, maxv.y+200, frand() ) );
+
+        size_t w,h;
+        GetDefaultSize(w,h);
+        float mgn=20;
+        float minx=-(float)w/2+mgn, maxx=(float)w/2-mgn;
+        float miny=-(float)h/2+mgn, maxy=(float)h/2-mgn;
+        if(p.x<minx)p.x=minx+mgn; else if(p.x>maxx) p.x=maxx-mgn;
+        if(p.y<miny)p.y=miny+mgn; else if(p.y>maxy) p.y=maxy-mgn;
+
+        BodyState *bs = new BodyState( CELL_PRIO_LOW, playerIndex, -1, this );
+        cpBody *body = CreateCellBody( p, bs, false );
+    }
 }
 
 // Draws the scene
@@ -405,7 +443,6 @@ void DrawBody( cpBody *body, Game *game ) {
     XMFLOAT3 dxtkPos( cppos.x+scrw/2, - cppos.y + scrh/2, 0 );
     XMFLOAT4 groupCol = Game::GetPlayerColor( bs->group_id );
     
-    //    print( "id:%d g:%d xy:%f,%f", bs->id, bs->group_id, dxtkPos.x, dxtkPos.y );
     if( bs->eye_id >= 0 ) {
         XMFLOAT4 eyeCol = XMFLOAT4( bs->force,0.2,0.2,1);
         DrawCircle( game->GetPrimBatch(), dxtkPos, bs->radius, groupCol );
@@ -426,13 +463,13 @@ void eachBodyPushCallback( cpBody *body, void *data ) {
 void SortBodiesById( std::vector<cpBody*> &vec ) {
     SorterEntry ents[1024];
     assert( vec.size() <= 1024 );
-    for(int i=0; i<vec.size();i++ ) {
+    for(unsigned int i=0; i<vec.size();i++ ) {
         ents[i].ptr = vec[i];
         BodyState *bs = (BodyState*) cpBodyGetUserData( vec[i] );
-        ents[i].val = bs->id;
+        ents[i].val = bs->draw_priority;
     }
     quickSortF( ents, 0, vec.size()-1);    
-    for(int i=0;i<vec.size();i++) {
+    for(unsigned int i=0;i<vec.size();i++) {
         vec[i] = (cpBody*) ents[i].ptr;
     }    
 }
@@ -495,7 +532,7 @@ void Game::Render()
     std::vector<cpBody*> to_sort_body;
     cpSpaceEachBody( m_space, eachBodyPushCallback, (void*) &to_sort_body );
     SortBodiesById( to_sort_body );
-    for(int i=0;i<to_sort_body.size();i++){
+    for(unsigned int i=0;i<to_sort_body.size();i++){
         cpBody *body = to_sort_body[i];
         DrawBody(body, this);
     }
@@ -512,7 +549,7 @@ void Game::Render()
 
     for(int i=0;i<MAX_PLAYER_NUM;i++) {
         TCHAR nummsg[100];
-        wsprintf( nummsg, L"P%d:%d", i, m_cellCounts[i] );
+        wsprintf( nummsg, L"P%d:%d", i, m_cellCounts[i] - 2 );
 
         DirectX::FXMVECTOR color = DirectX::Colors::White;
         m_spriteFont->DrawString( m_spriteBatch, nummsg, XMFLOAT2(300 + i * 150 ,10), color );

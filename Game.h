@@ -29,6 +29,10 @@ using Microsoft::WRL::ComPtr;
 #define MAX_PLAYER_NUM 4
 #define HP_CONSUME_SPEED 0.2
 #define CELL_RADIUS 10.0f
+#define BODY_CELL_NUM_PER_PLAYER 100
+#define CELL_NUM_PER_PLAYER ( 2 + BODY_CELL_NUM_PER_PLAYER )
+#define TOTAL_CELL_NUM (CELL_NUM_PER_PLAYER * MAX_PLAYER_NUM )
+
 
 //////////////
 
@@ -59,6 +63,8 @@ struct CreatureForce {
 public:
     XMFLOAT2 leftEye, rightEye;
 };
+
+class BodyState;
 
 // A basic game implementation that creates a D3D11 device and
 // provides a game loop
@@ -103,6 +109,7 @@ public:
 
     void onBodySeparated();
     void IncrementCellCount( int groupid );
+    void ResetPlayerCells( int playerid );
     
 private:
 
@@ -114,7 +121,8 @@ private:
     void OnDeviceLost();
 
     void InitGameWorld();
-    
+
+    cpBody *CreateCellBody( cpVect pos, BodyState *bs, bool is_eye );
 
     // Application state
     HWND                                            m_window;
@@ -151,6 +159,7 @@ private:
 
     // chipmunk related
     struct cpSpace *m_space;
+    cpBody *m_lefteyes[MAX_PLAYER_NUM], *m_righteyes[MAX_PLAYER_NUM];
 
 	AudioEngine *m_audioEngine;
 	SoundEffect *m_brokenSE, *m_damageSE;

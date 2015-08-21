@@ -28,7 +28,9 @@ class Game;
 
 class BodyState {
 public:
-	int id;
+#define CELL_PRIO_HIGH 1
+#define CELL_PRIO_LOW 0
+	int draw_priority;
     int group_id;
     int eye_id; // -1 for normal, 0,1 for eyes (left/right joystick)
     float force;
@@ -36,7 +38,7 @@ public:
 #define BODY_MAXHP 100
     Game *game;
     float radius;
-	BodyState(int id, int gid, int eye_id, Game *game) : id(id), group_id(gid), eye_id(eye_id), force(0), hp(BODY_MAXHP), game(game), radius(0) {};
+	BodyState(int prio, int gid, int eye_id, Game *game) : draw_priority(prio), group_id(gid), eye_id(eye_id), force(0), hp(BODY_MAXHP), game(game), radius(0) {};
     float GetHPRate() { return hp / (float)BODY_MAXHP; }
 };
 
