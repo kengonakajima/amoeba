@@ -163,6 +163,7 @@ private:
 
 	AudioEngine *m_audioEngine;
 	SoundEffect *m_brokenSE, *m_damageSE;
+    SoundEffect *m_bgm;
 
     // Movement
     CreatureForce m_forces[MAX_PLAYER_NUM];

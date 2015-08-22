@@ -101,11 +101,12 @@ void Game::Initialize(HWND window)
 	m_audioEngine = new AudioEngine(eflags);
 	m_damageSE = new SoundEffect(m_audioEngine, L"assets\\hit_soft.wav");
 	m_brokenSE = new SoundEffect(m_audioEngine, L"assets\\hagareta.wav");
-
+    m_bgm = new SoundEffect( m_audioEngine, L"assets\\BGM_AmoebasBattle.wav");
 
     // chipmunk
     InitGameWorld();
     InitCreatureForce();
+
 }
 
 void Game::InitGameWorld() {
@@ -267,7 +268,6 @@ static void PostConstraintFree(cpConstraint *constraint, cpSpace *space){
 }
 
 static void BodyFreeWrap(cpSpace *space, cpBody *body, void *unused){
-    print("BODYFREEWRAP %p", body );
 	cpSpaceRemoveBody(space, body);
     BodyState *bs = (BodyState*) cpBodyGetUserData(body);
     delete bs;
@@ -281,12 +281,12 @@ static void PostBodyFree(cpBody *body, cpSpace *space){
 
 
 void eachShapeDeleteCallback( cpBody *body, cpShape *shape, void *data ) {
-    print("eachShapeDeleteCallback shape:%p body:%p", shape, body );
+    //    print("eachShapeDeleteCallback shape:%p body:%p", shape, body );
     Game *game = (Game*) data;
     PostShapeFree( shape, game->GetSpace());
 }
 void eachConstraintDeleteCallback( cpBody *body, cpConstraint *ct, void *data ) {
-    print("eachConstraintDeleteCallback: ct:%p body:%p", ct, body );
+    //    print("eachConstraintDeleteCallback: ct:%p body:%p", ct, body );
     Game *game = (Game*) data;
     PostConstraintFree( ct, game->GetSpace() );
 }
@@ -389,6 +389,11 @@ void Game::Update(DX::StepTimer const& timer)
             // Died! Resetting..
             ResetPlayerCells(i);            
         }
+    }
+
+    // keep BGM playing (couldn't use DXTK loop feature don't know why)
+    if( m_bgm->IsInUse()==false) {
+        m_bgm->Play();
     }
 }
 void Game::ResetPlayerCells( int playerIndex ) {
@@ -898,6 +903,7 @@ void Game::GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye ) 
 }
 
 void Game::onBodySeparated() {
+    //    if( m_brokenSE->IsInUse())return;
     m_brokenSE->Play();
 }
 void Game::IncrementCellCount( int groupid ) {
