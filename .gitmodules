@@ -1,0 +1,3 @@
+[submodule "CCDK"]
+	path = CCDK
+	url = https://github.com/ShinraTech/CCDK
