@@ -56,6 +56,7 @@ public:
     void ResetCellCount() { m_cellCount=0; }
     int GetCellCount() { return m_cellCount; }
     void ResetCells();
+    void CleanCells();
     int GetGroupId() { return group_id; }
     Player( Game *game, int group_id ) : game(game), group_id(group_id), m_cellCount(0) {
         for(int i=0;i<2;i++) {
@@ -129,6 +130,8 @@ public:
     static cpVect GetPlayerDefaultPosition( int index, float *dia );
 
     cpBody *CreateCellBody( cpVect pos, BodyState *bs, bool is_eye );
+
+    void CleanGroup( int groupId );
     
 private:
 

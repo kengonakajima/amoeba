@@ -344,11 +344,8 @@ void Player::ResetCells() {
     cpBody *re = m_eyes[1];
     cpVect lv = cpBodyGetPosition(le);
     cpVect rv = cpBodyGetPosition(re);
-
     float dia;
     cpVect center = Game::GetPlayerDefaultPosition( group_id, &dia );
-    
-    
     for(int i=0;i<BODY_CELL_NUM_PER_PLAYER;i++) {
         cpVect p = cpv( cpflerp( center.x-dia, center.x+dia, frand() ), cpflerp( center.y-dia, center.y+dia, frand() ) );
         BodyState *bs = new BodyState( CELL_PRIO_LOW, group_id, -1, game );
@@ -356,6 +353,10 @@ void Player::ResetCells() {
         cpBodySetUserData(body,bs);
     }
 }
+void Player::CleanCells() {
+    game->CleanGroup( group_id );
+}
+
 
 // Draws the scene
 void DrawCircle( PrimitiveBatch<VertexPositionColor> *pb, XMFLOAT3 pos, float dia, XMFLOAT4 col ) {
@@ -813,14 +814,22 @@ void Game::OnKeydown(int keycode) {
 
 	OutputDebugString(s);
 
-	if (keycode == 'Q' ) exit(0); 
+	if (keycode == 'Q' ) exit(0);
+#if 1    
 	if (keycode == 'P') {
         AddPlayer();
     }
     if( keycode == 'U' ) {
-        
+        for(int i=0;i<MAX_PLAYER_NUM;i++) {
+            if(m_players[i]) {
+                m_players[i]->CleanCells();
+                delete m_players[i];
+                m_players[i] = nullptr;
+                break;
+            }
+        }
     }
-    
+#endif    
 }
 
 
@@ -943,4 +952,24 @@ cpVect Game::GetPlayerDefaultPosition( int index, float *dia ) {
     case 3: return cpv( wf/4, -hf/4 );        
     }
     return cpv(0,0);
+}
+
+struct CleanCallbackOpts {
+    Game *game;
+    int group_id;
+};
+void eachBodyCleanCallback( cpBody *body, void *data ) {
+    CleanCallbackOpts *opts = (CleanCallbackOpts*)data;
+    BodyState *bs = (BodyState*) cpBodyGetUserData(body);
+    if( bs->group_id == opts->group_id ) {
+        cpBodyEachShape(body, eachShapeDeleteCallback, opts->game );
+        cpBodyEachConstraint(body, eachConstraintDeleteCallback, opts->game );        
+        PostBodyFree( body, opts->game->GetSpace() );
+    }
+}
+void Game::CleanGroup( int groupid ) {
+    CleanCallbackOpts opts;
+    opts.game = this;
+    opts.group_id = groupid;
+    cpSpaceEachBody( m_space, eachBodyCleanCallback, (void*) & opts );
 }
