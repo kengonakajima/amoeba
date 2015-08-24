@@ -35,34 +35,51 @@ using Microsoft::WRL::ComPtr;
 
 
 //////////////
-
-/* One-to-many Player
+class Game;
   
 class Player
 {
 public:
-    Player( shinra::PlayerID playerID, std::shared_ptr<SpriteFont> font);
-    shinra::PlayerID getPlayerID() { return playerID; }
-    void Update();
-    void Render(int frameCnt);
-    void handleInput(const RAWINPUT& rawInput);
+    //    Player( shinra::PlayerID playerID, std::shared_ptr<SpriteFont> font);
+    //    shinra::PlayerID getPlayerID() { return playerID; }
+    //    void Update();
+    //    void Render(int frameCnt);
+    //    void handleInput(const RAWINPUT& rawInput);
+    void SetLeftEye(cpBody *bd) { m_eyes[0] = bd; }
+    void SetRightEye(cpBody *bd) { m_eyes[1] = bd; }
+    cpBody *GetLeftEye() { return m_eyes[0]; }
+    cpBody *GetRightEye() { return m_eyes[1]; }    
+    void SetForce( XMFLOAT2 lf, XMFLOAT2 rf ) { m_forces[0] = lf; m_forces[1] = rf; };
+    XMFLOAT2 GetLeftForce() { return m_forces[0];  };
+    XMFLOAT2 GetRightForce() { return m_forces[1]; };    
+    void IncrementCellCount() { m_cellCount ++; }
+    void ResetCellCount() { m_cellCount=0; }
+    int GetCellCount() { return m_cellCount; }
+    void ResetCells();
+    int GetGroupId() { return group_id; }
+    Player( Game *game, int group_id ) : game(game), group_id(group_id), m_cellCount(0) {
+        for(int i=0;i<2;i++) {
+            m_eyes[i]=nullptr;
+            m_forces[i]=XMFLOAT2(0,0);
+        }
+    }
 private:
+    Game *game;
+    int group_id;
+    int m_cellCount;
+    cpBody *m_eyes[2]; // 0:Left 1:Right
+    XMFLOAT2 m_forces[2]; // 0:Left 1:Right
+    
     // Show status logs
-    shinra::PlayerID playerID;
-    std::unique_ptr<SpriteBatch> m_spriteBatch;
-    std::shared_ptr<SpriteFont> m_spriteFont;
-    std::unique_ptr<AudioEngine> m_audioEngine;
-    std::unique_ptr<SoundEffect> m_soundEffect;
-    WCHAR						m_lastKey;
+    //    shinra::PlayerID playerID;
+    //    std::unique_ptr<SpriteBatch> m_spriteBatch;
+    //    std::shared_ptr<SpriteFont> m_spriteFont;
+    //    std::unique_ptr<AudioEngine> m_audioEngine;
+    //    std::unique_ptr<SoundEffect> m_soundEffect;
+    //    WCHAR						m_lastKey;
 
 };
-*/
 
-
-struct CreatureForce {
-public:
-    XMFLOAT2 leftEye, rightEye;
-};
 
 class BodyState;
 
@@ -94,22 +111,24 @@ public:
 	void OnKeydown(int keycode);
 
     // Properites
-    void GetDefaultSize( size_t& width, size_t& height ) const;
+    static void GetDefaultSize( size_t& width, size_t& height );
 
     static XMFLOAT4 GetPlayerColor( int index );
 
     PrimitiveBatch<VertexPositionColor> *GetPrimBatch() { return m_primBatch; }
 
-    void InitCreatureForce() {
-        for(int i=0;i<MAX_PLAYER_NUM;i++) SetCreatureForce( 0, XMFLOAT2(0,0), XMFLOAT2(0,0) );
-    }
-    void SetCreatureForce( int index, XMFLOAT2 leftEye, XMFLOAT2 rightEye );
-    void GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye );
+    //    void SetCreatureForce( int index, XMFLOAT2 leftEye, XMFLOAT2 rightEye );
+    //    void GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye );
     cpSpace *GetSpace() { return m_space; };
 
-    void onBodySeparated();
-    void IncrementCellCount( int groupid );
-    void ResetPlayerCells( int playerid );
+    void onBodySeparated( cpBody *bodyA, cpBody *bodyB );
+    void onBodyJointed( cpBody *bodyA, cpBody *bodyB );
+    void onBodyCollide( cpBody *bodyA, cpBody *bodyB );    
+    bool AddPlayer();
+    Player *GetPlayer( int groupId );
+    static cpVect GetPlayerDefaultPosition( int index, float *dia );
+
+    cpBody *CreateCellBody( cpVect pos, BodyState *bs, bool is_eye );
     
 private:
 
@@ -122,7 +141,6 @@ private:
 
     void InitGameWorld();
 
-    cpBody *CreateCellBody( cpVect pos, BodyState *bs, bool is_eye );
 
     // Application state
     HWND                                            m_window;
@@ -144,7 +162,7 @@ private:
     // Game state
     DX::StepTimer                                   m_timer;
 	int m_framecnt;
-    int m_cellCounts[MAX_PLAYER_NUM];
+    Player *m_players[MAX_PLAYER_NUM];
 
 	// Show status logs
 	SpriteBatch *m_spriteBatch;
@@ -159,14 +177,10 @@ private:
 
     // chipmunk related
     struct cpSpace *m_space;
-    cpBody *m_lefteyes[MAX_PLAYER_NUM], *m_righteyes[MAX_PLAYER_NUM];
 
 	AudioEngine *m_audioEngine;
-	SoundEffect *m_brokenSE, *m_damageSE;
+	SoundEffect *m_brokenSE, *m_damageSE, *m_joinSE;
     SoundEffect *m_bgm;
-
-    // Movement
-    CreatureForce m_forces[MAX_PLAYER_NUM];
     
 };
 

@@ -41,6 +41,7 @@ Game::Game() :
     m_featureLevel( D3D_FEATURE_LEVEL_11_1 ),
 	m_framecnt(0)
 {
+    for(int i=0;i<MAX_PLAYER_NUM;i++) m_players[i] = nullptr;
 }
 
 // Initialize the Direct3D resources required to run.
@@ -101,12 +102,11 @@ void Game::Initialize(HWND window)
 	m_audioEngine = new AudioEngine(eflags);
 	m_damageSE = new SoundEffect(m_audioEngine, L"assets\\hit_soft.wav");
 	m_brokenSE = new SoundEffect(m_audioEngine, L"assets\\hagareta.wav");
+    m_joinSE = new SoundEffect(m_audioEngine, L"assets\\kuttsuki.wav");
     m_bgm = new SoundEffect( m_audioEngine, L"assets\\BGM_AmoebasBattle.wav");
 
     // chipmunk
     InitGameWorld();
-    InitCreatureForce();
-
 }
 
 void Game::InitGameWorld() {
@@ -124,7 +124,7 @@ void Game::InitGameWorld() {
     size_t w,h;
     GetDefaultSize(w,h);
 
-    float mgn=30;
+    float mgn=10;
     float minx = -(float)w/2+mgn, maxx = w/2-mgn, miny = -(float)h/2+mgn, maxy = h/2-mgn;
 	shape = cpSpaceAddShape(m_space, cpSegmentShapeNew(staticBody, cpv(minx,miny), cpv(minx, maxy), 20.0f)); // left
 	cpShapeSetElasticity(shape, 1.0f);
@@ -146,65 +146,6 @@ void Game::InitGameWorld() {
 	cpShapeSetFriction(shape, 1.0f);
 	cpShapeSetFilter(shape, NOT_GRABBABLE_FILTER);
 
-    
-    for(int i=0;i<MAX_PLAYER_NUM;i++) m_lefteyes[i] = m_righteyes[i] = NULL;
-
-    int n = TOTAL_CELL_NUM;
-	for(int i=0; i<n; i++){
-
-        int group_id = i % MAX_PLAYER_NUM;
-        int eye_id = -1;
-        float pcminx,pcmaxx,pcminy,pcmaxy;
-
-        assert( MAX_PLAYER_NUM==4);        
-        if( group_id == 0 ) {
-            pcminx = minx+20;
-            pcmaxx = -50;
-            pcminy = miny;
-            pcmaxy = -50;
-        } else if( group_id == 1 ){
-            pcminx = minx+20;
-            pcmaxx = -50;
-            pcminy = 50;
-            pcmaxy = maxy-20;
-        } else if( group_id == 2 ) {
-            pcminx = 50;
-            pcmaxx = maxx-20;
-            pcminy = miny;
-            pcmaxy = -50;
-        } else if( group_id == 3 ) {
-            pcminx = 50;
-            pcmaxx = maxx-20;
-            pcminy = 50;
-            pcmaxy = maxy-20;            
-        }
-        
-        // player eyes
-        assert( MAX_PLAYER_NUM==4);
-        if(i==n-1) eye_id = 0;
-        if(i==n-1-MAX_PLAYER_NUM) eye_id = 1;
-        if(i==n-2) eye_id = 0;
-        if(i==n-2-MAX_PLAYER_NUM) eye_id = 1;
-        if(i==n-3) eye_id = 0;
-        if(i==n-3-MAX_PLAYER_NUM) eye_id = 1;
-        if(i==n-4) eye_id = 0;
-        if(i==n-4-MAX_PLAYER_NUM) eye_id = 1;
-
-        int prio;
-        if( eye_id >= 0 ) prio = CELL_PRIO_HIGH; else prio = CELL_PRIO_LOW; // draw eyes always on other cells
-        BodyState *bs = new BodyState(prio,group_id,eye_id, this);
-
-        cpVect p = cpv( cpflerp(pcminx, pcmaxx, frand()), cpflerp(pcminy, pcmaxy, frand() ) );
-        cpBody *body = CreateCellBody(p, bs, eye_id >= 0 );
-
-        if( eye_id == 0 ) m_lefteyes[group_id] = body;
-        else if( eye_id == 1 ) m_righteyes[group_id] = body;
-
-	}
-    // add springs between eyes
-    for(int i=0;i<MAX_PLAYER_NUM;i++) {
-        cpSpaceAddConstraint( m_space, new_spring( m_lefteyes[i], m_righteyes[i], cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );
-    }
 
 	
 	cpCollisionHandler *handler = cpSpaceAddWildcardHandler(m_space, COLLISION_TYPE_STICKY);
@@ -219,8 +160,7 @@ cpBody *Game::CreateCellBody( cpVect pos, BodyState *bs, bool is_eye ) {
 
     
     cpBody *body = cpSpaceAddBody(m_space, cpBodyNew( mass, cpMomentForCircle(mass, 0.0f, radius, cpvzero)));
-        
-    //    print("%d: %.1f,%.1f  eye:%d gr:%d", i, p.x, p.y, eye_id, group_id );
+
     cpBodySetPosition(body, pos);
     cpBodySetUserData(body, bs);
 
@@ -295,7 +235,11 @@ void eachConstraintDeleteCallback( cpBody *body, cpConstraint *ct, void *data ) 
 void eachBodyGameUpdateCallback( cpBody *body, void *data ) {
     BodyState *bs = (BodyState*) cpBodyGetUserData(body);
     Game *game = (Game*) data;
-    game->IncrementCellCount(bs->group_id);
+    Player *pl = game->GetPlayer( bs->group_id );
+    assert(pl);
+    
+    pl->IncrementCellCount();
+    
     if( bs->eye_id < 0 ) {
         bs->hp -= HP_CONSUME_SPEED;
         if( bs->hp < 0 ) {
@@ -307,24 +251,19 @@ void eachBodyGameUpdateCallback( cpBody *body, void *data ) {
             return;
         }
     } else {
-        int player_index = bs->group_id;
-        int force_index = bs->eye_id;
-
-        XMFLOAT2 l,r;
-        game->GetCreatureForce( player_index, &l, &r );
-
         float scl = 10000;
         cpVect f;
-        if( force_index == 0 ) { 
-            f = cpv( l.x * scl, l.y * scl );
-            bs->force = len( l.x, l.y );
+        if( bs->eye_id == 0 ) {
+            XMFLOAT2 lf = pl->GetLeftForce();
+            f = cpv( lf.x * scl, lf.y * scl );
+            bs->force = len( lf.x, lf.y );
+            cpBodySetForce( body, f );        
         } else {
-            f = cpv( r.x * scl, r.y * scl );
-            bs->force = len( r.x, r.y );
-            //        cpBodySetTorque( body, len(f.x,f.y)*10 );
+            XMFLOAT2 rf = pl->GetRightForce();            
+            f = cpv( rf.x * scl, rf.y * scl );
+            bs->force = len( rf.x, rf.y );
+            cpBodySetForce( body, f );        
         }
-
-        cpBodySetForce( body, f );        
 
         // Eyes keep max HP 
         bs->hp = BODY_MAXHP;
@@ -375,19 +314,22 @@ void Game::Update(DX::StepTimer const& timer)
     for(int i=0;i<MAX_PLAYER_NUM;i++) {
         auto state = GetGamePadState(i);      
         if( state.IsConnected()) {
-            SetCreatureForce( i,
-                              XMFLOAT2( state.thumbSticks.leftX, state.thumbSticks.leftY),
-                              XMFLOAT2( state.thumbSticks.rightX, state.thumbSticks.rightY)
-                              );
+            Player *pl = GetPlayer(i);
+            if(pl) pl->SetForce( XMFLOAT2( state.thumbSticks.leftX, state.thumbSticks.leftY),
+                                 XMFLOAT2( state.thumbSticks.rightX, state.thumbSticks.rightY)
+                                 );
         }
     }
+    for(int i=0;i<MAX_PLAYER_NUM;i++) {
+        Player *pl = GetPlayer(i);
+        if( pl ) pl->ResetCellCount();
+    }
     cpSpaceEachConstraint( m_space, eachConstraintGameUpdateCallback, this );
-    for(int i=0;i<MAX_PLAYER_NUM;i++) m_cellCounts[i]=0;
     cpSpaceEachBody( m_space, eachBodyGameUpdateCallback, (void*) this );
     for(int i=0;i<MAX_PLAYER_NUM;i++) {
-        if( m_cellCounts[i] == 2 ) {
-            // Died! Resetting..
-            ResetPlayerCells(i);            
+        Player *pl = GetPlayer(i);
+        if( pl && pl->GetCellCount() == 2 ) {
+            pl->ResetCells();
         }
     }
 
@@ -396,26 +338,22 @@ void Game::Update(DX::StepTimer const& timer)
         m_bgm->Play();
     }
 }
-void Game::ResetPlayerCells( int playerIndex ) {
-    cpBody *le = m_lefteyes[playerIndex];
-    cpBody *re = m_righteyes[playerIndex];
+
+void Player::ResetCells() {
+    cpBody *le = m_eyes[0];
+    cpBody *re = m_eyes[1];
     cpVect lv = cpBodyGetPosition(le);
     cpVect rv = cpBodyGetPosition(re);
-    cpVect minv = cpv( minf(lv.x,rv.x), minf(lv.y,rv.y) );
-    cpVect maxv = cpv( maxf(lv.x,rv.x), maxf(lv.y,rv.y) );
+
+    float dia;
+    cpVect center = Game::GetPlayerDefaultPosition( group_id, &dia );
+    
+    
     for(int i=0;i<BODY_CELL_NUM_PER_PLAYER;i++) {
-        cpVect p = cpv( cpflerp( minv.x-300, maxv.x+300, frand() ), cpflerp( minv.y-200, maxv.y+200, frand() ) );
-
-        size_t w,h;
-        GetDefaultSize(w,h);
-        float mgn=20;
-        float minx=-(float)w/2+mgn, maxx=(float)w/2-mgn;
-        float miny=-(float)h/2+mgn, maxy=(float)h/2-mgn;
-        if(p.x<minx)p.x=minx+mgn; else if(p.x>maxx) p.x=maxx-mgn;
-        if(p.y<miny)p.y=miny+mgn; else if(p.y>maxy) p.y=maxy-mgn;
-
-        BodyState *bs = new BodyState( CELL_PRIO_LOW, playerIndex, -1, this );
-        cpBody *body = CreateCellBody( p, bs, false );
+        cpVect p = cpv( cpflerp( center.x-dia, center.x+dia, frand() ), cpflerp( center.y-dia, center.y+dia, frand() ) );
+        BodyState *bs = new BodyState( CELL_PRIO_LOW, group_id, -1, game );
+        cpBody *body = game->CreateCellBody( p, bs, false );
+        cpBodySetUserData(body,bs);
     }
 }
 
@@ -553,11 +491,13 @@ void Game::Render()
 	m_spriteFont->DrawString(m_spriteBatch, statmsg, XMFLOAT2(10, 10));
 
     for(int i=0;i<MAX_PLAYER_NUM;i++) {
-        TCHAR nummsg[100];
-        wsprintf( nummsg, L"P%d:%d", i, m_cellCounts[i] - 2 );
-
-        DirectX::FXMVECTOR color = DirectX::Colors::White;
-        m_spriteFont->DrawString( m_spriteBatch, nummsg, XMFLOAT2(300 + i * 150 ,10), color );
+        Player *pl = GetPlayer(i);
+        if(pl) {
+            TCHAR nummsg[100];
+            wsprintf( nummsg, L"P%d:%d", i, pl->GetCellCount() - 2 );
+            DirectX::FXMVECTOR color = DirectX::Colors::White;
+            m_spriteFont->DrawString( m_spriteBatch, nummsg, XMFLOAT2(300 + i * 150 ,10), color );
+        }
     }
 #if 0
 	m_spriteFont->DrawString(m_spriteBatch, L"Skeleton code for 1:1 games", XMFLOAT2(100, 100) );
@@ -639,7 +579,7 @@ void Game::OnWindowSizeChanged()
 }
 
 // Properties
-void Game::GetDefaultSize(size_t& width, size_t& height) const
+void Game::GetDefaultSize(size_t& width, size_t& height)
 {
     // TODO: Change to desired default window size (note minimum size is 320x200)
     width = 1280;
@@ -874,7 +814,13 @@ void Game::OnKeydown(int keycode) {
 	OutputDebugString(s);
 
 	if (keycode == 'Q' ) exit(0); 
-	if (keycode == 'P') m_brokenSE->Play();
+	if (keycode == 'P') {
+        AddPlayer();
+    }
+    if( keycode == 'U' ) {
+        
+    }
+    
 }
 
 
@@ -891,24 +837,110 @@ XMFLOAT4 Game::GetPlayerColor( int index ) {
     return g_playerColors[index];
 }
 
-void Game::SetCreatureForce( int index, XMFLOAT2 leftEye, XMFLOAT2 rightEye ) {
-    assert(index>=0 && index < MAX_PLAYER_NUM );
-    m_forces[index].leftEye = leftEye;
-    m_forces[index].rightEye = rightEye;
-}
-void Game::GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye ) {
-    assert(index>=0 && index < MAX_PLAYER_NUM );    
-    *leftEye = m_forces[index].leftEye;
-    *rightEye = m_forces[index].rightEye;
-}
 
-void Game::onBodySeparated() {
+void Game::onBodySeparated( cpBody *bodyA, cpBody *bodyB ) {
+#if 0    
     //    if( m_brokenSE->IsInUse())return;
-    m_brokenSE->Play();
-}
-void Game::IncrementCellCount( int groupid ) {
-    assert( groupid >= 0 && groupid < MAX_PLAYER_NUM );
-    m_cellCounts[groupid] ++;
+
+    cpVect veloA = cpBodyGetVelocity(bodyA);
+    cpVect veloB = cpBodyGetVelocity(bodyB);
+    float relvelo = len( veloA.x, veloA.y, veloB.x, veloB.y );
+    print("onBodySeparated: %.2f", relvelo );
+    if( relvelo > 100 ) {
+        m_brokenSE->Play();
+    }
+#endif    
 }
 
-////////////////////
+void Game::onBodyJointed( cpBody *bodyA, cpBody *bodyB ) {
+#if 0    
+    cpVect veloA = cpBodyGetVelocity(bodyA);
+    cpVect veloB = cpBodyGetVelocity(bodyB);
+    float relvelo = len( veloA.x, veloA.y, veloB.x, veloB.y );
+    print("onBodyJointed: %.2f", relvelo );
+    if( relvelo > 400 ) {
+        m_joinSE->Play();
+    }
+#endif
+}
+
+void Game::onBodyCollide( cpBody *bodyA, cpBody *bodyB ) {
+    cpVect veloA = cpBodyGetVelocity(bodyA);
+    cpVect veloB = cpBodyGetVelocity(bodyB);
+    float relvelo = len( veloA.x, veloA.y, veloB.x, veloB.y );
+    //    print("onBodyCollide: %.2f", relvelo );
+    if( relvelo > 400 ) {
+        m_joinSE->Play();
+    }    
+}
+// return false when max player
+bool Game::AddPlayer() {
+    Player *pl = nullptr;
+    for(int i=0;i<MAX_PLAYER_NUM;i++) {
+        if( m_players[i] == nullptr ) {
+            m_players[i] = new Player( this, i );
+            pl = m_players[i];
+            print("AddPlayer: new player %d",i);
+            break;
+        }
+    }
+    if(pl==nullptr) return false;
+
+    float dia;
+    cpVect center = GetPlayerDefaultPosition( pl->GetGroupId(), &dia );
+    
+    int n = CELL_NUM_PER_PLAYER;
+	for(int i=0; i<n; i++){
+        int prio, eye_id=-1;
+        if(i==0 ||i==1) {
+            eye_id = i;
+            prio = CELL_PRIO_HIGH;
+        } else {
+            prio = CELL_PRIO_LOW; // draw eyes always on other cells
+        }
+        
+        BodyState *bs = new BodyState(prio,pl->GetGroupId(),eye_id, this);
+
+        cpVect p = cpv( cpflerp(center.x-dia, center.x+dia, frand()), cpflerp(center.y-dia, center.y+dia, frand() ) );
+        cpBody *body = CreateCellBody(p, bs, eye_id >= 0 );
+
+        if( eye_id == 0 ) pl->SetLeftEye(body);
+        else if( eye_id == 1 ) pl->SetRightEye(body);
+
+	}
+    // add springs between eyes
+    cpSpaceAddConstraint( m_space, new_spring( pl->GetLeftEye(), pl->GetRightEye(), cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );
+    return true;
+}
+Player *Game::GetPlayer( int group_id ) {
+    assert( group_id >= 0 && group_id < MAX_PLAYER_NUM );
+    return m_players[group_id];
+}
+cpVect Game::GetPlayerDefaultPosition( int index, float *dia ) {
+    size_t w,h;
+    GetDefaultSize(w,h);
+    float wf = (float)w, hf = (float)h;
+
+    *dia = wf/6.0f;
+    
+    /*
+            |
+         0  |  1
+            |   
+       -----O----
+            |
+         2  |  3
+            |
+
+       O: (0,0) in ChipMunk
+       
+     */
+    index = index % 4;
+    switch(index) {
+    case 0: return cpv( -wf/4, hf/4);
+    case 1: return cpv( wf/4, hf/4 );
+    case 2: return cpv( -wf/4, -hf/4 );
+    case 3: return cpv( wf/4, -hf/4 );        
+    }
+    return cpv(0,0);
+}

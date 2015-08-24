@@ -7,7 +7,6 @@
 
 
 
-
 cpShapeFilter GRAB_FILTER = { CP_NO_GROUP, GRABBABLE_MASK_BIT, GRABBABLE_MASK_BIT };
 cpShapeFilter NOT_GRABBABLE_FILTER = { CP_NO_GROUP, ~GRABBABLE_MASK_BIT, ~GRABBABLE_MASK_BIT };
 
@@ -66,7 +65,12 @@ cpBool StickyPreSolve(cpArbiter *arb, cpSpace *space, void *data)
 
 			// Store the joint on the arbiter so we can remove it later.
 			cpArbiterSetUserData(arb, joint);
-		}
+            Game *game = bsA->game;
+            game->onBodyJointed(bodyA,bodyB);
+		} else {
+            Game *game = bsA->game;
+            game->onBodyCollide(bodyA,bodyB);
+        }
 	}
 	
 	// Position correction and velocity are handled separately so changing
@@ -108,9 +112,10 @@ void StickySeparate(cpArbiter *arb, cpSpace *space, void *data)
 		cpArbiterSetUserData(arb, NULL);
 
         cpBody *bodyA = cpConstraintGetBodyA(joint);
+        cpBody *bodyB = cpConstraintGetBodyB(joint);        
         BodyState *bs = (BodyState*) cpBodyGetUserData(bodyA);
         Game *game = bs->game;
-        game->onBodySeparated();
+        game->onBodySeparated( bodyA, bodyB );
 	}
 }
 
