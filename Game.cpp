@@ -817,7 +817,7 @@ void Game::OnKeydown(int keycode) {
 	if (keycode == 'Q' ) exit(0);
 #if 1    
 	if (keycode == 'P') {
-        AddPlayer();
+        AddPlayer(0);
     }
     if( keycode == 'U' ) {
         for(int i=0;i<MAX_PLAYER_NUM;i++) {
@@ -883,11 +883,11 @@ void Game::onBodyCollide( cpBody *bodyA, cpBody *bodyB ) {
     }    
 }
 // return false when max player
-bool Game::AddPlayer() {
+bool Game::AddPlayer( shinra::PlayerID playerID ) {
     Player *pl = nullptr;
     for(int i=0;i<MAX_PLAYER_NUM;i++) {
         if( m_players[i] == nullptr ) {
-            m_players[i] = new Player( this, i );
+            m_players[i] = new Player( playerID, this, i );
             pl = m_players[i];
             print("AddPlayer: new player %d",i);
             break;

@@ -15,6 +15,10 @@
 #include "Audio.h"
 #include "GamePad.h"
 
+#ifdef USE_SHINRA_API
+#include "ShinraGame.h"
+#endif
+
 #include "Main.h"
 #include "AnimatedTexture.h"
 #include "Util.h"
@@ -58,20 +62,21 @@ public:
     void ResetCells();
     void CleanCells();
     int GetGroupId() { return group_id; }
-    Player( Game *game, int group_id ) : game(game), group_id(group_id), m_cellCount(0) {
+    Player( shinra::PlayerID playerID, Game *game, int group_id ) : m_playerID(playerID), game(game), group_id(group_id), m_cellCount(0) {
         for(int i=0;i<2;i++) {
             m_eyes[i]=nullptr;
             m_forces[i]=XMFLOAT2(0,0);
         }
     }
 private:
+    shinra::PlayerID m_playerID;
     Game *game;
     int group_id;
     int m_cellCount;
     cpBody *m_eyes[2]; // 0:Left 1:Right
     XMFLOAT2 m_forces[2]; // 0:Left 1:Right
     
-    // Show status logs
+    // Resources
     //    shinra::PlayerID playerID;
     //    std::unique_ptr<SpriteBatch> m_spriteBatch;
     //    std::shared_ptr<SpriteFont> m_spriteFont;
@@ -125,7 +130,7 @@ public:
     void onBodySeparated( cpBody *bodyA, cpBody *bodyB );
     void onBodyJointed( cpBody *bodyA, cpBody *bodyB );
     void onBodyCollide( cpBody *bodyA, cpBody *bodyB );    
-    bool AddPlayer();
+    bool AddPlayer( shinra::PlayerID playerID );
     Player *GetPlayer( int groupId );
     static cpVect GetPlayerDefaultPosition( int index, float *dia );
 
