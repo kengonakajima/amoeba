@@ -88,9 +88,21 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
         }
         else
         {
+            shinra::Event *event = shinra::GetNextEvent();
+            if( event != nullptr ) {
+                switch(event->type) {
+                case shinra::ET_PLAYER_LOGGED_IN:
+                    g_game->AddPlayer(event->playerID);
+                    break;
+                case shinra::ET_PLAYER_LOGGED_OFF:
+                    g_game->RemovePlayer(event->playerID);
+                    break;
+                }
+            }
             g_game->Tick();
         }
     }
+    print("main loop finished");
 
     g_game.reset();
 

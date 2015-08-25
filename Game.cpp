@@ -7,6 +7,7 @@
 #include "CommonStates.h"
 #include <assert.h>
 
+#include "MMDeviceapi.h"
 
 
 
@@ -60,51 +61,7 @@ void Game::Initialize(HWND window)
     m_timer.SetFixedTimeStep(true);
     m_timer.SetTargetElapsedSeconds(1.0 / 60);
     */
-	m_spriteBatch = new SpriteBatch(m_d3dContext.Get());
-	m_spriteFont = new SpriteFont( m_d3dDevice.Get(), L"assets\\tahoma9.spritefont");
-    m_primBatch = new PrimitiveBatch<VertexPositionColor>(m_d3dContext.Get());
-
-    m_basicEffect = new BasicEffect(m_d3dDevice.Get() );
-    size_t scrw, scrh;
-    GetDefaultSize(scrw,scrh);    
-    m_basicEffect->SetProjection( XMMatrixOrthographicOffCenterRH(0, (float)scrw, (float)scrh, 0,0,1 ) );
-    m_basicEffect->SetVertexColorEnabled(true);
-
-    void const* shaderByteCode;
-    size_t byteCodeLength ;
-    m_basicEffect->GetVertexShaderBytecode( &shaderByteCode, &byteCodeLength );
-    m_d3dDevice->CreateInputLayout( VertexPositionColor::InputElements,
-                                    VertexPositionColor::InputElementCount,
-                                    shaderByteCode, byteCodeLength,
-                                    m_inputLayout.GetAddressOf() );
-
     
-    //
-    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cell;
-    enum DDS_ALPHA_MODE alphamode = DDS_ALPHA_MODE_STRAIGHT;
-    HRESULT hr = CreateDDSTextureFromFile( m_d3dDevice.Get(), L"assets\\basic_cell.dds", nullptr, cell.GetAddressOf(), alphamode );
-    DX::ThrowIfFailed(hr);
-
-    // Create an AnimatedTexture helper class instance and set it to use our texture
-    // which is assumed to have 4 frames of animation with a FPS of 2 seconds
-    m_cellAnimTex = new AnimatedTexture( XMFLOAT2(0,0), 0.f, 2.f, 0.5f );
-    m_cellAnimTex->Load( cell.Get(), 4, 2 );
-
-    hr = CreateDDSTextureFromFile( m_d3dDevice.Get(), L"assets\\wave.dds", nullptr, m_bgTex.GetAddressOf(), alphamode );
-    DX::ThrowIfFailed(hr);    
-    
-	// This is only needed in Win32 desktop apps
-	CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-	AUDIO_ENGINE_FLAGS eflags = AudioEngine_Default;
-#ifdef _DEBUG
-	eflags = eflags | AudioEngine_Debug;
-#endif
-	m_audioEngine = new AudioEngine(eflags);
-	m_damageSE = new SoundEffect(m_audioEngine, L"assets\\hit_soft.wav");
-	m_brokenSE = new SoundEffect(m_audioEngine, L"assets\\hagareta.wav");
-    m_joinSE = new SoundEffect(m_audioEngine, L"assets\\kuttsuki.wav");
-    m_bgm = new SoundEffect( m_audioEngine, L"assets\\BGM_AmoebasBattle.wav");
-
     // chipmunk
     InitGameWorld();
 }
@@ -236,7 +193,7 @@ void eachBodyGameUpdateCallback( cpBody *body, void *data ) {
     BodyState *bs = (BodyState*) cpBodyGetUserData(body);
     Game *game = (Game*) data;
     Player *pl = game->GetPlayer( bs->group_id );
-    assert(pl);
+    if(!pl)return; 
     
     pl->IncrementCellCount();
     
@@ -297,11 +254,11 @@ void Game::Update(DX::StepTimer const& timer)
     // TODO: Add your game logic here
     elapsedTime;
 
-	m_audioEngine->Update();
-	if (m_audioEngine->IsCriticalError()) {
-		OutputDebugString(L"AudioEngine error!");
-	}
-    m_cellAnimTex->Update(elapsedTime);
+    for(int i=0;i<MAX_PLAYER_NUM;i++) {
+        Player *pl = GetPlayer(i);
+        if(pl) pl->Update(elapsedTime);
+    }
+
     PhysUpdateSpace( m_space, elapsedTime );
 
     // read joystick
@@ -333,10 +290,6 @@ void Game::Update(DX::StepTimer const& timer)
         }
     }
 
-    // keep BGM playing (couldn't use DXTK loop feature don't know why)
-    if( m_bgm->IsInUse()==false) {
-        m_bgm->Play();
-    }
 }
 
 void Player::ResetCells() {
@@ -375,7 +328,7 @@ void DrawCircle( PrimitiveBatch<VertexPositionColor> *pb, XMFLOAT3 pos, float di
 }
 
 
-void DrawBody( cpBody *body, Game *game ) {
+void Player::DrawBody( cpBody *body ) {
     BodyState *bs = (BodyState*) cpBodyGetUserData(body);
 
     cpVect cppos = cpBodyGetPosition(body);
@@ -386,16 +339,15 @@ void DrawBody( cpBody *body, Game *game ) {
     game->GetDefaultSize(scrw,scrh);
     XMFLOAT3 dxtkPos( cppos.x+scrw/2, - cppos.y + scrh/2, 0 );
     XMFLOAT4 groupCol = Game::GetPlayerColor( bs->group_id );
-    
     if( bs->eye_id >= 0 ) {
         XMFLOAT4 eyeCol = XMFLOAT4( bs->force,0.2,0.2,1);
-        DrawCircle( game->GetPrimBatch(), dxtkPos, bs->radius, groupCol );
-        DrawCircle( game->GetPrimBatch(), dxtkPos, bs->radius-3, eyeCol );
+        DrawCircle( GetPrimBatch(), dxtkPos, bs->radius, groupCol );
+        DrawCircle( GetPrimBatch(), dxtkPos, bs->radius-3, eyeCol );
     } else {        
         float hprate = bs->GetHPRate();
         XMFLOAT4 cellCol( groupCol.x * hprate, groupCol.y * hprate, groupCol.z * hprate, 1.0f );
         
-        DrawCircle( game->GetPrimBatch(), dxtkPos, bs->radius, cellCol );
+        DrawCircle( GetPrimBatch(), dxtkPos, bs->radius, cellCol );
     }
     
     
@@ -424,16 +376,26 @@ void Game::Render()
     if (m_timer.GetFrameCount() == 0)
         return;
 
+    for(int i=0;i<MAX_PLAYER_NUM;i++) {
+        Player *pl = GetPlayer(i);
+        if(pl) pl->Render();
+    }
+
+    Present();    
+}
+
+void Player::Render() {
+    
     Clear();
 
-    CommonStates states(m_d3dDevice.Get());
+    CommonStates states(game->GetD3DDevice().Get());
     // Background
 	m_spriteBatch->Begin( SpriteSortMode_Deferred, states.NonPremultiplied() );
     RECT bgrect;
     bgrect.left = 0;
     bgrect.top = 0;
     size_t w,h;
-    GetDefaultSize( w,h);
+    game->GetDefaultSize( w,h);
     bgrect.right = w;
     bgrect.bottom = h;
     
@@ -456,7 +418,7 @@ void Game::Render()
     m_d3dContext->OMSetDepthStencilState( states.DepthNone(), 0 );
     m_d3dContext->RSSetState( states.CullCounterClockwise() );
 
-    m_basicEffect->Apply( m_d3dContext.Get() );
+    m_basicEffect->Apply( m_d3dContext );
     m_d3dContext->IASetInputLayout( m_inputLayout.Get() );
 
     m_primBatch->Begin();
@@ -474,11 +436,11 @@ void Game::Render()
 
     // cells
     std::vector<cpBody*> to_sort_body;
-    cpSpaceEachBody( m_space, eachBodyPushCallback, (void*) &to_sort_body );
+    cpSpaceEachBody( game->GetSpace(), eachBodyPushCallback, (void*) &to_sort_body );
     SortBodiesById( to_sort_body );
     for(unsigned int i=0;i<to_sort_body.size();i++){
         cpBody *body = to_sort_body[i];
-        DrawBody(body, this);
+        DrawBody(body);
     }
     m_primBatch->End();
 
@@ -488,11 +450,11 @@ void Game::Render()
 	m_spriteBatch->Begin( SpriteSortMode_Deferred, states.NonPremultiplied() );
 
 	TCHAR statmsg[100];
-	wsprintf(statmsg, L"Frame: %d", m_framecnt);
+	wsprintf(statmsg, L"Frame: %d", game->GetFrameCnt());
 	m_spriteFont->DrawString(m_spriteBatch, statmsg, XMFLOAT2(10, 10));
 
     for(int i=0;i<MAX_PLAYER_NUM;i++) {
-        Player *pl = GetPlayer(i);
+        Player *pl = game->GetPlayer(i);
         if(pl) {
             TCHAR nummsg[100];
             wsprintf( nummsg, L"P%d:%d", i, pl->GetCellCount() - 2 );
@@ -513,21 +475,25 @@ void Game::Render()
                          
 	m_spriteBatch->End();
     
-
-    Present();
 }
 
 // Helper method to clear the backbuffers
 void Game::Clear()
 {
+    for(int i=0;i<MAX_PLAYER_NUM;i++) {
+        Player *pl = GetPlayer(i);
+        if(pl) pl->Clear();
+    }
+}
+void Player::Clear() {
     // Clear the views
 	float d = 100.0f;
 	int m = 25;
 	float r = (rand() % m) / d, g = (rand() % m) /d, b = (rand() % m) / d;
 	float col[4] = { r,g,b,1 };
-    m_d3dContext->ClearRenderTargetView(m_renderTargetView.Get(), col );
-    m_d3dContext->ClearDepthStencilView(m_depthStencilView.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
-    m_d3dContext->OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), m_depthStencilView.Get());
+    m_d3dContext->ClearRenderTargetView( game->GetRenderTargetView().Get(), col );
+    m_d3dContext->ClearDepthStencilView( game->GetDepthStencilView().Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
+    m_d3dContext->OMSetRenderTargets(1, game->GetRenderTargetView().GetAddressOf(), game->GetDepthStencilView().Get());    
 }
 
 // Presents the backbuffer contents to the screen
@@ -584,7 +550,7 @@ void Game::GetDefaultSize(size_t& width, size_t& height)
 {
     // TODO: Change to desired default window size (note minimum size is 320x200)
     width = 1280;
-    height = 768;
+    height = 720;
 }
 
 // These are the resources that depend on the device.
@@ -815,7 +781,7 @@ void Game::OnKeydown(int keycode) {
 	OutputDebugString(s);
 
 	if (keycode == 'Q' ) exit(0);
-#if 1    
+#ifndef USE_SHINRA_API    
 	if (keycode == 'P') {
         AddPlayer(0);
     }
@@ -848,38 +814,23 @@ XMFLOAT4 Game::GetPlayerColor( int index ) {
 
 
 void Game::onBodySeparated( cpBody *bodyA, cpBody *bodyB ) {
-#if 0    
-    //    if( m_brokenSE->IsInUse())return;
-
-    cpVect veloA = cpBodyGetVelocity(bodyA);
-    cpVect veloB = cpBodyGetVelocity(bodyB);
-    float relvelo = len( veloA.x, veloA.y, veloB.x, veloB.y );
-    print("onBodySeparated: %.2f", relvelo );
-    if( relvelo > 100 ) {
-        m_brokenSE->Play();
-    }
-#endif    
 }
 
 void Game::onBodyJointed( cpBody *bodyA, cpBody *bodyB ) {
-#if 0    
-    cpVect veloA = cpBodyGetVelocity(bodyA);
-    cpVect veloB = cpBodyGetVelocity(bodyB);
-    float relvelo = len( veloA.x, veloA.y, veloB.x, veloB.y );
-    print("onBodyJointed: %.2f", relvelo );
-    if( relvelo > 400 ) {
-        m_joinSE->Play();
-    }
-#endif
 }
-
+void Game::PlaySEForAll( SE_ID se_id ) {
+    for(int i=0;i<MAX_PLAYER_NUM;i++) {
+        Player *pl = GetPlayer(i);
+        if(pl)pl->PlaySE(se_id);
+    }
+}
 void Game::onBodyCollide( cpBody *bodyA, cpBody *bodyB ) {
     cpVect veloA = cpBodyGetVelocity(bodyA);
     cpVect veloB = cpBodyGetVelocity(bodyB);
     float relvelo = len( veloA.x, veloA.y, veloB.x, veloB.y );
     //    print("onBodyCollide: %.2f", relvelo );
     if( relvelo > 400 ) {
-        m_joinSE->Play();
+        PlaySEForAll( SE_JOIN );
     }    
 }
 // return false when max player
@@ -921,6 +872,19 @@ bool Game::AddPlayer( shinra::PlayerID playerID ) {
     cpSpaceAddConstraint( m_space, new_spring( pl->GetLeftEye(), pl->GetRightEye(), cpv(0,0),cpv(0,0), 70, 110, 0.1 ) );
     return true;
 }
+
+void Game::RemovePlayer( shinra::PlayerID playerID ) {
+    for(int i=0;i<MAX_PLAYER_NUM;i++){
+        if( m_players[i]->getPlayerID() == playerID ) {
+            print("RemovePlayer: id:%d found. removing.", playerID );
+            Player *pl = m_players[i];
+            delete pl;
+            m_players[i] = nullptr;
+            break;
+        }
+    }
+}
+
 Player *Game::GetPlayer( int group_id ) {
     assert( group_id >= 0 && group_id < MAX_PLAYER_NUM );
     return m_players[group_id];
@@ -972,4 +936,104 @@ void Game::CleanGroup( int groupid ) {
     opts.game = this;
     opts.group_id = groupid;
     cpSpaceEachBody( m_space, eachBodyCleanCallback, (void*) & opts );
+}
+
+Player::Player( shinra::PlayerID playerID, Game *game, int group_id ) : m_playerID(playerID), game(game), group_id(group_id), m_cellCount(0) {        
+    for(int i=0;i<2;i++) {
+        m_eyes[i]=nullptr;
+        m_forces[i]=XMFLOAT2(0,0);
+    }
+
+    // Audio
+    AUDIO_ENGINE_FLAGS eflags = AudioEngine_Default;
+    /* TODO: debug engine is not currently support in Shinra Audio Layer.
+#ifdef _DEBUG
+    eflags = eflags | AudioEngine_Debug;
+#endif
+    */
+    auto audioDevice = shinra::GetPlayerAudioDevice(playerID);
+    assert(audioDevice);
+
+    LPWSTR audioId = nullptr;
+    m_audioEngine = new AudioEngine(eflags, nullptr, audioId);
+    CoTaskMemFree(audioId);
+    audioDevice->Release();
+
+    m_brokenSE = new SoundEffect(m_audioEngine, L"assets\\hagareta.wav");
+    m_joinSE = new SoundEffect(m_audioEngine, L"assets\\kuttsuki.wav");
+    m_bgm = new SoundEffect( m_audioEngine, L"assets\\BGM_AmoebasBattle.wav");
+
+
+    // Graphics
+
+    m_d3dContext = shinra::GetPlayerRenderingContext(playerID);
+    assert(m_d3dContext);
+    m_spriteBatch = new SpriteBatch(m_d3dContext);
+    
+	m_spriteBatch = new SpriteBatch(m_d3dContext);
+	m_spriteFont = new SpriteFont( game->GetD3DDevice().Get(), L"assets\\tahoma9.spritefont");
+    m_primBatch = new PrimitiveBatch<VertexPositionColor>(m_d3dContext);
+
+    m_basicEffect = new BasicEffect( game->GetD3DDevice().Get() );
+    size_t scrw, scrh;
+    game->GetDefaultSize(scrw,scrh);    
+    m_basicEffect->SetProjection( XMMatrixOrthographicOffCenterRH(0, (float)scrw, (float)scrh, 0,0,1 ) );
+    m_basicEffect->SetVertexColorEnabled(true);
+
+    void const* shaderByteCode;
+    size_t byteCodeLength ;
+    m_basicEffect->GetVertexShaderBytecode( &shaderByteCode, &byteCodeLength );
+    game->GetD3DDevice()->CreateInputLayout( VertexPositionColor::InputElements,
+                                             VertexPositionColor::InputElementCount,
+                                             shaderByteCode, byteCodeLength,
+                                             m_inputLayout.GetAddressOf() );
+
+    
+    //
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cell;
+    enum DDS_ALPHA_MODE alphamode = DDS_ALPHA_MODE_STRAIGHT;
+    HRESULT hr = CreateDDSTextureFromFile( game->GetD3DDevice().Get(), L"assets\\basic_cell.dds", nullptr, cell.GetAddressOf(), alphamode );
+    DX::ThrowIfFailed(hr);
+
+    // Create an AnimatedTexture helper class instance and set it to use our texture
+    // which is assumed to have 4 frames of animation with a FPS of 2 seconds
+    m_cellAnimTex = new AnimatedTexture( XMFLOAT2(0,0), 0.f, 2.f, 0.5f );
+    m_cellAnimTex->Load( cell.Get(), 4, 2 );
+
+    hr = CreateDDSTextureFromFile( game->GetD3DDevice().Get(), L"assets\\wave.dds", nullptr, m_bgTex.GetAddressOf(), alphamode );
+    DX::ThrowIfFailed(hr);    
+}
+Player::~Player() {
+    CleanCells();
+    delete m_spriteBatch;
+    delete m_spriteFont;
+    delete m_primBatch;
+    delete m_basicEffect;
+    //    delete m_inputLayout;
+    delete m_cellAnimTex;
+    //    delete m_bgTex;
+    //    delete m_d3dContext;
+
+    delete m_audioEngine;
+    delete m_brokenSE, *m_joinSE, *m_bgm;    
+}
+void Player::Update( float elapsedTime ) {
+	m_audioEngine->Update();
+    if (m_audioEngine->IsCriticalError()) {
+        OutputDebugString(L"AudioEngine error!");
+	}
+    
+    // keep BGM playing (couldn't use DXTK loop feature don't know why)
+    if( m_bgm->IsInUse()==false) {
+        //        m_bgm->Play();
+    }
+
+    // graphics update
+    m_cellAnimTex->Update(elapsedTime);    
+}
+void Player::PlaySE( SE_ID se_id ) {
+    switch(se_id) {
+    case SE_JOIN: m_joinSE->Play(); break;
+    case SE_BROKEN: m_brokenSE->Play(); break;
+    }
 }

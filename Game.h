@@ -40,14 +40,21 @@ using Microsoft::WRL::ComPtr;
 
 //////////////
 class Game;
-  
+
+typedef enum {
+    SE_JOIN = 0,
+    SE_BROKEN = 1,
+} SE_ID;
+
 class Player
 {
 public:
     //    Player( shinra::PlayerID playerID, std::shared_ptr<SpriteFont> font);
-    //    shinra::PlayerID getPlayerID() { return playerID; }
-    //    void Update();
-    //    void Render(int frameCnt);
+    shinra::PlayerID getPlayerID() { return m_playerID; }
+    void Update( float elapsedTime );
+    void Render();
+    void Clear();
+    
     //    void handleInput(const RAWINPUT& rawInput);
     void SetLeftEye(cpBody *bd) { m_eyes[0] = bd; }
     void SetRightEye(cpBody *bd) { m_eyes[1] = bd; }
@@ -62,12 +69,15 @@ public:
     void ResetCells();
     void CleanCells();
     int GetGroupId() { return group_id; }
-    Player( shinra::PlayerID playerID, Game *game, int group_id ) : m_playerID(playerID), game(game), group_id(group_id), m_cellCount(0) {
-        for(int i=0;i<2;i++) {
-            m_eyes[i]=nullptr;
-            m_forces[i]=XMFLOAT2(0,0);
-        }
-    }
+    void PlaySE( SE_ID se_id );
+    PrimitiveBatch<VertexPositionColor> *GetPrimBatch() { return m_primBatch; }
+    SpriteBatch *GetSpriteBatch() { return m_spriteBatch; }
+    void DrawBody( cpBody *body );
+    
+    Player( shinra::PlayerID playerID, Game *game, int group_id );
+    ~Player();
+
+
 private:
     shinra::PlayerID m_playerID;
     Game *game;
@@ -76,13 +86,20 @@ private:
     cpBody *m_eyes[2]; // 0:Left 1:Right
     XMFLOAT2 m_forces[2]; // 0:Left 1:Right
     
-    // Resources
-    //    shinra::PlayerID playerID;
-    //    std::unique_ptr<SpriteBatch> m_spriteBatch;
-    //    std::shared_ptr<SpriteFont> m_spriteFont;
-    //    std::unique_ptr<AudioEngine> m_audioEngine;
-    //    std::unique_ptr<SoundEffect> m_soundEffect;
-    //    WCHAR						m_lastKey;
+    // Graphics Resources
+
+    SpriteBatch *m_spriteBatch;
+    SpriteFont *m_spriteFont;
+    PrimitiveBatch<VertexPositionColor> *m_primBatch;
+    BasicEffect *m_basicEffect;
+    ComPtr<ID3D11InputLayout> m_inputLayout;
+    AnimatedTexture *m_cellAnimTex;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_bgTex;
+    ID3D11DeviceContext *m_d3dContext;
+
+    // Audio resources
+    AudioEngine *m_audioEngine;
+    SoundEffect *m_brokenSE, *m_joinSE, *m_bgm;
 
 };
 
@@ -105,7 +122,7 @@ public:
     void Render();
 
     // Rendering helpers
-    void Clear();
+    void Clear();    
     void Present();
 
     // Messages
@@ -121,7 +138,7 @@ public:
 
     static XMFLOAT4 GetPlayerColor( int index );
 
-    PrimitiveBatch<VertexPositionColor> *GetPrimBatch() { return m_primBatch; }
+
 
     //    void SetCreatureForce( int index, XMFLOAT2 leftEye, XMFLOAT2 rightEye );
     //    void GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye );
@@ -131,13 +148,20 @@ public:
     void onBodyJointed( cpBody *bodyA, cpBody *bodyB );
     void onBodyCollide( cpBody *bodyA, cpBody *bodyB );    
     bool AddPlayer( shinra::PlayerID playerID );
+    void RemovePlayer(shinra::PlayerID playerID );
     Player *GetPlayer( int groupId );
     static cpVect GetPlayerDefaultPosition( int index, float *dia );
 
     cpBody *CreateCellBody( cpVect pos, BodyState *bs, bool is_eye );
 
     void CleanGroup( int groupId );
+    void PlaySEForAll( SE_ID se_id );
+    Microsoft::WRL::ComPtr<ID3D11Device> GetD3DDevice() { return m_d3dDevice; }
+    int GetFrameCnt() { return m_framecnt; }
     
+    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> GetRenderTargetView() { return m_renderTargetView; }
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilView> GetDepthStencilView() { return m_depthStencilView; }
+
 private:
 
     void Update(DX::StepTimer const& timer);
@@ -172,23 +196,10 @@ private:
 	int m_framecnt;
     Player *m_players[MAX_PLAYER_NUM];
 
-	// Show status logs
-	SpriteBatch *m_spriteBatch;
-	SpriteFont *m_spriteFont;
-    PrimitiveBatch<VertexPositionColor> *m_primBatch;
-    BasicEffect *m_basicEffect;
-    ComPtr<ID3D11InputLayout> m_inputLayout;
-    
-    // game sprites, textures
-    AnimatedTexture *m_cellAnimTex;
-    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_bgTex;
-
     // chipmunk related
     struct cpSpace *m_space;
 
-	AudioEngine *m_audioEngine;
-	SoundEffect *m_brokenSE, *m_damageSE, *m_joinSE;
-    SoundEffect *m_bgm;
+    //	AudioEngine *m_audioEngine;
     
 };
 
