@@ -5,11 +5,11 @@
   "apiKey": "sk_dev_5debac4fe233fa144fa0caff",
   "startups": [
     {
-      "id": "DebugOneN",
+      "id": "ReleaseOneN",
       "multiconnection": true,
       "numberOfPlayers": 4,
       "dataPackId": "DataPack",
-      "executable": "DebugOneN\\amoeba.exe",
+      "executable": "amoeba.exe",
       "workDir": "",
       "arguments": null,
       "FileHooks": null,
@@ -21,23 +21,15 @@
   "dataPacks": [
     {
       "id": "DataPack",
-      "version": "1",
+      "version": "",
       "files": [
         {
           "aliasPath": "",
-          "fileSystemPath": "C:\\Users\\ringo\\Documents\\GitHub\\amoeba\\Release"
+          "fileSystemPath": "C:\\Users\\ringo\\Documents\\GitHub\\amoeba\\ReleaseOneN"
         },
         {
           "aliasPath": "assets",
           "fileSystemPath": "C:\\Users\\ringo\\Documents\\GitHub\\amoeba\\assets"
-        },
-        {
-          "aliasPath": "Debug",
-          "fileSystemPath": "C:\\Users\\ringo\\Documents\\GitHub\\amoeba\\Debug"
-        },
-        {
-          "aliasPath": "DebugOneN",
-          "fileSystemPath": "C:\\Users\\ringo\\Documents\\GitHub\\amoeba\\DebugOneN"
         }
       ]
     }
