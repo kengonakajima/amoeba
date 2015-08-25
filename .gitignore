@@ -6,6 +6,7 @@ packages
 *.vsp
 DebugD3D/*
 DebugOneN/*
+ReleaseOneN/*
 Debug
 Release
 Thumbs.db
