@@ -1025,7 +1025,7 @@ void Player::Update( float elapsedTime ) {
     
     // keep BGM playing (couldn't use DXTK loop feature don't know why)
     if( m_bgm->IsInUse()==false) {
-        //        m_bgm->Play();
+        m_bgm->Play();
     }
 
     // graphics update
