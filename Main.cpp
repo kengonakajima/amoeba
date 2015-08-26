@@ -215,3 +215,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     return DefWindowProc(hWnd, message, wParam, lParam);
 }
+
+
+
+
+#ifndef USE_SHINRA_API
+namespace shinra
+{
+    Event *GetNextEvent() {
+        return nullptr;
+    }
+    IMMDevice* GetPlayerAudioDevice(PlayerID playerID) {
+        return nullptr;
+    }
+    ID3D11DeviceContext* GetPlayerRenderingContext(PlayerID playerID) {
+        return nullptr;
+    }
+    
+};
+#endif

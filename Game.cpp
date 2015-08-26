@@ -549,8 +549,8 @@ void Game::OnWindowSizeChanged()
 void Game::GetDefaultSize(size_t& width, size_t& height)
 {
     // TODO: Change to desired default window size (note minimum size is 320x200)
-    width = 1280;
-    height = 720;
+    width = 800;
+    height = 600;
 }
 
 // These are the resources that depend on the device.
@@ -952,12 +952,18 @@ Player::Player( shinra::PlayerID playerID, Game *game, int group_id ) : m_player
 #endif
     */
     auto audioDevice = shinra::GetPlayerAudioDevice(playerID);
-    assert(audioDevice);
+    if( audioDevice == nullptr ) {
+        // Don't use ShinraGame API
+        m_audioEngine = new AudioEngine(eflags);
+    } else {
+        // Use ShinraGame API
+        LPWSTR audioId = nullptr;
+        audioDevice->GetId(&audioId);
+        m_audioEngine = new AudioEngine(eflags, nullptr, audioId);
+        CoTaskMemFree(audioId);
+        audioDevice->Release();        
+    }
 
-    LPWSTR audioId = nullptr;
-    m_audioEngine = new AudioEngine(eflags, nullptr, audioId);
-    CoTaskMemFree(audioId);
-    audioDevice->Release();
 
     m_brokenSE = new SoundEffect(m_audioEngine, L"assets\\hagareta.wav");
     m_joinSE = new SoundEffect(m_audioEngine, L"assets\\kuttsuki.wav");
@@ -967,7 +973,12 @@ Player::Player( shinra::PlayerID playerID, Game *game, int group_id ) : m_player
     // Graphics
 
     m_d3dContext = shinra::GetPlayerRenderingContext(playerID);
-    assert(m_d3dContext);
+    if(m_d3dContext==nullptr) {
+        // Don't use ShinraGame API
+        m_d3dContext = game->GetD3DContext().Get();
+    } else {
+        // Use ShinraGame API
+    }
     m_spriteBatch = new SpriteBatch(m_d3dContext);
     
 	m_spriteBatch = new SpriteBatch(m_d3dContext);
@@ -1037,3 +1048,5 @@ void Player::PlaySE( SE_ID se_id ) {
     case SE_BROKEN: m_brokenSE->Play(); break;
     }
 }
+
+

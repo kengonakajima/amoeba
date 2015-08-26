@@ -15,9 +15,7 @@
 #include "Audio.h"
 #include "GamePad.h"
 
-#ifdef USE_SHINRA_API
 #include "ShinraGame.h"
-#endif
 
 #include "Main.h"
 #include "AnimatedTexture.h"
@@ -36,6 +34,7 @@ using Microsoft::WRL::ComPtr;
 #define BODY_CELL_NUM_PER_PLAYER 100
 #define CELL_NUM_PER_PLAYER ( 2 + BODY_CELL_NUM_PER_PLAYER )
 #define TOTAL_CELL_NUM (CELL_NUM_PER_PLAYER * MAX_PLAYER_NUM )
+
 
 
 //////////////
@@ -135,13 +134,8 @@ public:
 
     // Properites
     static void GetDefaultSize( size_t& width, size_t& height );
-
     static XMFLOAT4 GetPlayerColor( int index );
 
-
-
-    //    void SetCreatureForce( int index, XMFLOAT2 leftEye, XMFLOAT2 rightEye );
-    //    void GetCreatureForce( int index, XMFLOAT2 *leftEye, XMFLOAT2 *rightEye );
     cpSpace *GetSpace() { return m_space; };
 
     void onBodySeparated( cpBody *bodyA, cpBody *bodyB );
@@ -157,6 +151,7 @@ public:
     void CleanGroup( int groupId );
     void PlaySEForAll( SE_ID se_id );
     Microsoft::WRL::ComPtr<ID3D11Device> GetD3DDevice() { return m_d3dDevice; }
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> GetD3DContext() { return m_d3dContext; }
     int GetFrameCnt() { return m_framecnt; }
     
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> GetRenderTargetView() { return m_renderTargetView; }
