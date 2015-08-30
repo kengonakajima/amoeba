@@ -14,17 +14,6 @@
       "arguments": null,
       "FileHooks": null,
       "CustomProperties": {}
-    },
-    {
-      "id": "DebugOneN",
-      "multiconnection": false,
-      "numberOfPlayers": 0,
-      "dataPackId": "DataPack",
-      "executable": "DebugOneN\\amoeba.exe",
-      "workDir": "",
-      "arguments": null,
-      "FileHooks": null,
-      "CustomProperties": {}
     }
   ],
   "dataPacks": [
