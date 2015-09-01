@@ -819,6 +819,12 @@ void Game::onBodySeparated( cpBody *bodyA, cpBody *bodyB ) {
 void Game::onBodyJointed( cpBody *bodyA, cpBody *bodyB ) {
 }
 void Game::PlaySEForAll( SE_ID se_id ) {
+#ifdef USE_SHINRA_API
+    int n = MAX_PLAYER_NUM;
+#else
+    int n = 1; // To avoid overwrapped sound effects played
+#endif    
+    
     for(int i=0;i<MAX_PLAYER_NUM;i++) {
         Player *pl = GetPlayer(i);
         if(pl)pl->PlaySE(se_id);
@@ -1036,16 +1042,25 @@ void Player::Update( float elapsedTime ) {
     
     // keep BGM playing (couldn't use DXTK loop feature don't know why)
     if( m_bgm->IsInUse()==false) {
+#if USE_SHINRA_API
         m_bgm->Play();
+#else
+        if( group_id == 0 ) m_bgm->Play(); // To avoid overwrapped BGM
+#endif
     }
 
     // graphics update
     m_cellAnimTex->Update(elapsedTime);    
 }
 void Player::PlaySE( SE_ID se_id ) {
+    SoundEffect *to_play = nullptr;
+    
     switch(se_id) {
-    case SE_JOIN: m_joinSE->Play(); break;
-    case SE_BROKEN: m_brokenSE->Play(); break;
+    case SE_JOIN: to_play = m_joinSE; break;
+    case SE_BROKEN: to_play = m_brokenSE;
+    }
+    if( to_play && to_play->IsInUse() == false ) {
+        to_play->Play();
     }
 }
 
